@@ -379,7 +379,7 @@ public class ReportCalculateServiceImpl extends GlobalService implements ReportC
                 }
             } else {
                 System.out.println("Fichier type calculation");
-                if (efi.equalsIgnoreCase("F1000")) {
+                if (efi.equalsIgnoreCase("F1000")||efi.equalsIgnoreCase("FM1000")) {
                     List<Map<String, Object>> FICSQLr = findCalcByPoint1(efi);// all *** cells
                     List<Map<String, Object>> FICPOST = findCalcByPost(efi);
                     List<Map<String, Object>> FICSQLe = findCalcByPoint2(efi);// all *** cells
@@ -1437,7 +1437,7 @@ public class ReportCalculateServiceImpl extends GlobalService implements ReportC
     @Transactional
     public List<Map<String, Object>> findCalcByPost(String fic) {
         String sql = "Select distinct u.calc,u.fichi,u.col,u.post,u.typeval,u.divd,u.field ,u.source ,(case when a.rang is not NULL then a.rang else 0 end) rang,(case when EXISTS(SELECT * from rppfich WHERE col =u.col) then 1 else 0 end)status from rpcalc u LEFT JOIN rppfich a \n"
-                + "on u.fichi = a.fich and u.col = a.col and u.post =a.poste where u.fichi =? and u.source='P' ORDER BY u.COL asc,u.POST";
+                + "on u.fichi = a.fich and u.col = a.col and u.post =a.poste where u.fichi =? and u.source='P' and a.gen is null ORDER BY u.COL asc,u.POST";
         return jdbcTemplate.queryForList(sql, new Object[]{fic});
     }
 
