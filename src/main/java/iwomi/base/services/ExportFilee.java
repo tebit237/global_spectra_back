@@ -5,33 +5,48 @@
  */
 package iwomi.base.services;
 
+import iwomi.base.ServiceInterface.ServiceExportFile;
+import iwomi.base.objects.ReportRep;
 import iwomi.base.objects.SqlFileType;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.sql.SQLType;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletResponse;
+import org.apache.poi.EncryptedDocumentException;
 
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.apache.poi.xssf.streaming.SXSSFSheet;
 import org.apache.poi.xssf.streaming.SXSSFWorkbook;
 import org.apache.poi.xssf.usermodel.XSSFFont;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 
-public class ExportFilee {
+public class ExportFilee  {
 
     private SXSSFWorkbook workbook;
     private SXSSFSheet sheet;
     private int leng;
     private List<String> desp;
     private List<SqlFileType> listUsers;
-
+    
+     
     public ExportFilee(List<SqlFileType> listUsers, int leng, List<String> desp) {
         System.out.println("the declared ");
         this.leng = leng - 1;

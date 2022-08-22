@@ -72,6 +72,7 @@ import iwomi.base.repositories.ReportDatasGeneratedRepository;
 import iwomi.base.repositories.ReportFileRepository;
 import iwomi.base.repositories.ReportRepRepository;
 import java.io.BufferedReader;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.nio.charset.StandardCharsets;
@@ -83,7 +84,11 @@ import java.util.Calendar;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import org.apache.poi.EncryptedDocumentException;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -140,6 +145,7 @@ public class GenererFichierServiceImpl implements GenererFichierServices {
     private SqlFileTypeRepository sqlFileTypeRepository;
     @Autowired
     private GenFileRepository genFileRepository;
+      
 
     public Map<String, String> getGenerationAndSavingParam()
             throws SQLException, ClassNotFoundException, JSONException {
@@ -2250,6 +2256,58 @@ public class GenererFichierServiceImpl implements GenererFichierServices {
         }
         System.out.println("DATE VALUE RETURNED " + date1);
         return date1;
+
+    }
+    
+    @Override
+    public Map<String, Object> update_excel_file(Map<String, String> request) {
+         System.out.println("yvo start execution ");
+          Map<String, Object> result = new HashMap<>();
+         
+          ArrayList al = new ArrayList();
+        // from where file is to be read
+        //File file1 = new File("C:/savedexcel/FM1000.xlsx");
+        File file1 = new File("C:/savedexcel/bilan.xlsx");
+       // List<ReportRep> report = reportRepRepository.preparedResult12(request.get("file"), request.get("dar"));       
+        List<ReportRep> report=new ArrayList();
+        //CONST = 0;
+     //for (int j = 0; j < report.size(); j++) {
+       //System.out.println("yvo start execution "+report.get(j).getPost());
+         try {
+             //ajout d'element dans le fichier
+              FileInputStream fileI= new FileInputStream( file1);
+             Workbook workbookF = WorkbookFactory.create(fileI);
+             Sheet sheet = workbookF.getSheetAt(1);
+             int rowCount = sheet.getLastRowNum()+5;
+             System.out.println("yvo start execution rang2 ");
+            for (int r = 0; r <= rowCount; r++) {
+                System.out.println("yvo start execution cel01 ");
+                 Row row = sheet.createRow(r);
+                  //Row row = sheet.getRow(r);
+                 System.out.println("yvo start execution cell0 ");
+                 row.createCell(3).setCellValue(request.get("code"));
+                row.createCell(4).setCellValue(request.get("name"));
+                 System.out.println("yvo start execution cell2 ");
+                row.createCell(5).setCellValue(request.get("age"));
+                 row.createCell(6).setCellValue(request.get("bonjour yves"));
+                  System.out.println("yvo start execution cell3 ");
+             }
+           
+                fileI.close();
+                
+                FileOutputStream fileO = new FileOutputStream( file1);
+                workbookF.write(fileO);
+                fileO.close();
+                System.out.println("Data Copied to Excel");      
+         } catch (IOException ex) {
+             Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
+         } catch (EncryptedDocumentException ex) {
+             Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
+         }
+    // }
+          result.put("success", "01");
+          result.put("data", al);
+        return result;
 
     }
 

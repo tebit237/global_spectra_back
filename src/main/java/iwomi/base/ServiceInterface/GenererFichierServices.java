@@ -6,6 +6,7 @@
 package iwomi.base.ServiceInterface;
 
 import iwomi.base.form.GenererFichierForm;
+import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 
 /**
@@ -16,5 +17,7 @@ public interface GenererFichierServices {
     public String genererFichiers(GenererFichierForm fic);
     public String genererFichiersP(GenererFichierForm fic);
     public String genererFichiersLocal(GenererFichierForm fic);
+    
+    public Map<String, Object> update_excel_file(Map<String, String> request);
 
 }
