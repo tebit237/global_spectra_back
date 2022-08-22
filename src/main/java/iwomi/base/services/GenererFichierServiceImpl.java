@@ -866,6 +866,7 @@ public class GenererFichierServiceImpl implements GenererFichierServices {
                 } catch (Exception ex) {
                     Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
                 }
+                fileName = fic.getCodeFichier().get(i).getCode()+".xlsx";
                 if (typefile.get("result").equals("calculate")) {
                     calculationSesame(fic, i, CONST, defineFileToSave, fileName, typefile, dropdown, count, file);
                 } else if (typefile.get("result").equals("duplicateNoPost")) {
