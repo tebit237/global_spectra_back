@@ -32,14 +32,16 @@ public interface ReportRepRepository extends CrudRepository<ReportRep, Long>, Jp
 
     @Query(value = "select * from rprep where dar = to_date(?3,'yyyy-mm-dd') and fichier=?2 and post =?1", nativeQuery = true)
     List<ReportRep> findByFichierPostDar(String a, String c, String d);
+
     @Transactional
-    Long deleteByFichierAndDar(String fich,Date dar);
-    
+    Long deleteByFichierAndDar(String fich, Date dar);
+
     @Query(value = "select MAX(rang) rang,MAX(id) mx from rprep ", nativeQuery = true)
     List<BigDecimal> getMaxFileLine();
-    
+
     @Query(value = "select COALESCE(MAX(rang),0) rang from rprep where fichier =?1 and dar = to_date(?2,'yyyy-mm-dd')", nativeQuery = true)
-    List<BigDecimal> getMaxFileLinev1(String e,String dar);
+    List<BigDecimal> getMaxFileLinev1(String e, String dar);
+
     @Query(value = "select COALESCE(MAX(id),0) id from rprep", nativeQuery = true)
     List<BigDecimal> getMaxFileLinev2();
 
@@ -49,9 +51,9 @@ public interface ReportRepRepository extends CrudRepository<ReportRep, Long>, Jp
     List<ReportRep> findByFichierAndRangAndColAndDar(String f, Long rang, String col, Date d);
 
     List<ReportRep> findByFichierAndPostAndColAndDar(String f, String post, String col, Date d);
+
     @Query(value = "select * from rprep where dar = to_date(?4,'yyyy-mm-dd') and fichier = ?1 and post = ?2 and col = ?3 ", nativeQuery = true)
     ReportRep findByFichierAndPostAndColAndDar1(String f, String post, String col, String d);
-    
 
     Long countById(Long id);
 
@@ -78,37 +80,38 @@ public interface ReportRepRepository extends CrudRepository<ReportRep, Long>, Jp
     @Query(value = "SELECT g.* FROM (SELECT e.*,rownum r FROM rprep e WHERE e.fichier = ?1 AND e.dar LIKE ?4  ORDER BY e.rang Asc, e.col Asc) g WHERE  r > ?2 AND r <= ?3 ", nativeQuery = true)
     List<ReportRep> preparedResult1(String fich, int lowLimt, int upLimt, String d);
 
-    @Query(value = "SELECT f.col,f.crdt,f.cuser,e.dele,e.doc,f.etab,e.feuille,f.fich fichier,e.field,e.mdfi,e.muser,f.poste post, \n" +
-"					 (case when (f.gen = '***') then f.gen else e.valc end) valc,e.valm,e.valt,e.vald\n" +
-"			      ,e.crtd, e.dar,e.feild,e.filter,e.sens,f.rang,f.id,(case when(status is null)then 0 else status end )status\n" +
-"                     FROM (select * from rppfich j where j.fich = ?1) f\n" +
-"			      left join (select g.* from (select * from rprep where fichier =?1 AND dar = to_date(?2,'yyyy-mm-dd'))g\n" +
-"				   inner join(select post,fichier,col from rprep where fichier = ?1 and dar = to_date(?2,'yyyy-mm-dd') group by fichier,post,col having count(*)=1)q\n" +
-"				    on q.fichier = g.fichier and q.post = g.post and q.col = g.col\n" +
-"					where g.fichier = ?1 \n" +
-"			     ) e on f.poste = e.post and f.fich = e.fichier and f.col=e.col  ORDER BY  f.rang Asc, f.col Asc offset ?3 rows fetch next (?4-?3) rows only", nativeQuery = true)
+    @Query(value = "SELECT f.col,f.crdt,f.cuser,e.dele,e.doc,f.etab,e.feuille,f.fich fichier,e.field,e.mdfi,e.muser,f.poste post, \n"
+            + "					 (case when (f.gen = '***') then f.gen else e.valc end) valc,e.valm,e.valt,e.vald\n"
+            + "			      ,e.crtd, e.dar,e.feild,e.filter,e.sens,f.rang,f.id,(case when(status is null)then 0 else status end )status\n"
+            + "                     FROM (select * from rppfich j where j.fich = ?1) f\n"
+            + "			      left join (select g.* from (select * from rprep where fichier =?1 AND dar = to_date(?2,'yyyy-mm-dd'))g\n"
+            + "				   inner join(select post,fichier,col from rprep where fichier = ?1 and dar = to_date(?2,'yyyy-mm-dd') group by fichier,post,col having count(*)=1)q\n"
+            + "				    on q.fichier = g.fichier and q.post = g.post and q.col = g.col\n"
+            + "					where g.fichier = ?1 \n"
+            + "			     ) e on f.poste = e.post and f.fich = e.fichier and f.col=e.col  ORDER BY  f.rang Asc, f.col Asc offset ?3 rows fetch next (?4-?3) rows only", nativeQuery = true)
     List<ReportRep> preparedResult11(String fich, String d, int lowLimt, int upLimt);
-    
-    @Query(value = "SELECT f.col,f.crdt,f.cuser,e.dele,e.doc,f.etab,e.feuille,f.fich fichier,e.field,e.mdfi,e.muser,f.poste post, \n" +
-"					 (case when (f.gen = '***') then f.gen else e.valc end) valc,e.valm,e.valt,e.vald\n" +
-"			      ,e.crtd, e.dar,e.feild,e.filter,e.sens,f.rang,f.id,(case when(status is null)then 0 else status end )status\n" +
-"                     FROM (select * from rppfich j where j.fich = ?1) f\n" +
-"			      left join (select g.* from (select * from rprep where fichier =?1 AND dar = to_date(?2,'yyyy-mm-dd'))g\n" +
-"				   inner join(select post,fichier,col from rprep where fichier = ?1 and dar = to_date(?2,'yyyy-mm-dd') group by fichier,post,col having count(*)=1)q\n" +
-"				    on q.fichier = g.fichier and q.post = g.post and q.col = g.col\n" +
-"					where g.fichier = ?1 \n" +
-"			     ) e on f.poste = e.post and f.fich = e.fichier and f.col=e.col  ORDER BY  f.rang Asc, f.col ", nativeQuery = true)
+
+    @Query(value = "SELECT f.col,f.crdt,f.cuser,e.dele,e.doc,f.etab,e.feuille,f.fich fichier,e.field,e.mdfi,e.muser,f.poste post, \n"
+            + "					 (case when (f.gen = '***') then f.gen else e.valc end) valc,e.valm,e.valt,e.vald\n"
+            + "			      ,e.crtd, e.dar,e.feild,e.filter,e.sens,f.rang,f.id,(case when(status is null)then 0 else status end )status\n"
+            + "                     FROM (select * from rppfich j where j.fich = ?1) f\n"
+            + "			      left join (select g.* from (select * from rprep where fichier =?1 AND dar = to_date(?2,'yyyy-mm-dd'))g\n"
+            + "				   inner join(select post,fichier,col from rprep where fichier = ?1 and dar = to_date(?2,'yyyy-mm-dd') group by fichier,post,col having count(*)=1)q\n"
+            + "				    on q.fichier = g.fichier and q.post = g.post and q.col = g.col\n"
+            + "					where g.fichier = ?1 \n"
+            + "			     ) e on f.poste = e.post and f.fich = e.fichier and f.col=e.col  ORDER BY  f.rang Asc, f.col ", nativeQuery = true)
     List<ReportRep> preparedResult12(String fich, String d);
 
-    @Query(value = " SELECT f.col,f.crdt,f.cuser,e.dele,e.doc,f.etab,e.feuille,f.fich fichier,e.field,e.mdfi,e.muser,f.poste post, \n" +
-"					 (case when (f.gen = '***') then f.gen else e.valc end) valc,e.valm,e.valt,e.vald\n" +
-"			      ,e.crtd, e.dar,e.feild,e.filter,e.sens,f.rang,f.id,(case when(status is null)then 0 else status end )status\n" +
-"                     FROM (select * from rppfich j where j.fich = ?1 and source = ?5) f\n" +
-"			      left join (select g.* from (select * from rprep where fichier =?1  AND dar = to_date(?2,'yyyy-mm-dd'))g\n" +
-"				   inner join(select post,fichier,col from rprep where fichier = ?1 and dar = to_date(?2,'yyyy-mm-dd') group by fichier,post,col having count(*)=1)q\n" +
-"				    on q.fichier = g.fichier and q.post = g.post and q.col = g.col\n" +
-"					where g.fichier = ?1\n" +
-"			     ) e on f.poste = e.post and f.fich = e.fichier and f.col=e.col  ORDER BY  f.rang Asc, f.col  Asc offset ?3 rows fetch next (?4-?3) rows only", nativeQuery = true)
+
+    @Query(value = " SELECT f.col,f.crdt,f.cuser,e.dele,e.doc,f.etab,e.feuille,f.fich fichier,e.field,e.mdfi,e.muser,f.poste post, \n"
+            + "					 (case when (f.gen = '***') then f.gen else e.valc end) valc,e.valm,e.valt,e.vald\n"
+            + "			      ,e.crtd, e.dar,e.feild,e.filter,e.sens,f.rang,f.id,(case when(status is null)then 0 else status end )status\n"
+            + "                     FROM (select * from rppfich j where j.fich = ?1 and source = ?5) f\n"
+            + "			      left join (select g.* from (select * from rprep where fichier =?1  AND dar = to_date(?2,'yyyy-mm-dd'))g\n"
+            + "				   inner join(select post,fichier,col from rprep where fichier = ?1 and dar = to_date(?2,'yyyy-mm-dd') group by fichier,post,col having count(*)=1)q\n"
+            + "				    on q.fichier = g.fichier and q.post = g.post and q.col = g.col\n"
+            + "					where g.fichier = ?1\n"
+            + "			     ) e on f.poste = e.post and f.fich = e.fichier and f.col=e.col  ORDER BY  f.rang Asc, f.col  Asc offset ?3 rows fetch next (?4-?3) rows only", nativeQuery = true)
     List<ReportRep> preparedResult11_F1139(String fich, String d, int lowLimt, int upLimt, String s);
 
     @Query(value = "select * from\r\n"

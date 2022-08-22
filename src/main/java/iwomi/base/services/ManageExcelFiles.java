@@ -80,30 +80,36 @@ public class ManageExcelFiles extends GlobalService {
         return true;
     }
 
-    public void sesamGeneration(String filename) throws Exception {
+    public Path sesamGeneration(String filename, Statement ert) throws Exception {
         try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream();) {
             Sheet sheet = workbook.createSheet(SHEET);
-            Connection s = connectDB();
-            Statement ert = s.createStatement();
             ResultSet er = ert.executeQuery("select lib2 from sanm where tabcd = '0012' and acscd = '0038' and dele = 0");
             er.next();
             String fr1 = er.getString("lib2") + "/" + filename + ".xlsx";
             ResultSet err = ert.executeQuery("select lib2 from sanm where tabcd = '0012' and acscd = '0015' and dele = 0");
             err.next();
             String fr1r = err.getString("lib2") + "/" + filename + ".xlsx";
-            s.close();
-            Files.copy((new File(fr1)).toPath(), (new File(fr1r)).toPath());
-//copyFileUsingJava7Files();
-            Path path = Paths.get(fr1r);
-            Set<PosixFilePermission> perms = Files.readAttributes(path, PosixFileAttributes.class).permissions();
-            perms.add(PosixFilePermission.OTHERS_WRITE);
-            perms.add(PosixFilePermission.OTHERS_READ);
-            perms.add(PosixFilePermission.OTHERS_EXECUTE);
-            Files.setPosixFilePermissions(path, perms);
-
+            try {
+                Files.copy((new File(fr1)).toPath(), (new File(fr1r)).toPath());
+            } catch (IOException g) {
+                Files.delete((new File(fr1r)).toPath());
+                Files.copy((new File(fr1)).toPath(), (new File(fr1r)).toPath());
+            }
+            ResultSet erru = ert.executeQuery("select lib2 from sanm where tabcd = '0012' and acscd = '0041' and dele = 0");
+            erru.next();
+            if (erru.getString(1).equalsIgnoreCase("2") || erru.getString(1).equalsIgnoreCase("3")) {
+                Path path = Paths.get(fr1r);
+                Set<PosixFilePermission> perms = Files.readAttributes(path, PosixFileAttributes.class).permissions();
+                perms.add(PosixFilePermission.OTHERS_WRITE);
+                perms.add(PosixFilePermission.OTHERS_READ);
+                perms.add(PosixFilePermission.OTHERS_EXECUTE);
+                Files.setPosixFilePermissions(path, perms);
+            }
+           return (new File(fr1r)).toPath();
         } catch (IOException e) {
-            throw new RuntimeException("fail to import data to Excel file: " + e.getMessage());
+
         }
+        return null;
     }
 
     public List<ReportRep> excelToReport(InputStream is, String file, Date dar, int colnum) {

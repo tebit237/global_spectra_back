@@ -292,6 +292,12 @@ public class ChargerDonneesServiceImpl implements ChargerDonneesService {
                 if (result.getString("acscd").equalsIgnoreCase("0029")) {
                     PARAM.put("minimumNumber", result.getString("lib2"));
                 }
+                if (result.getString("acscd").equalsIgnoreCase("0036")) {
+                    PARAM.put("typeReporting", result.getString("lib2"));
+                }
+                if (result.getString("acscd").equalsIgnoreCase("0040")) {
+                    PARAM.put("templatedir", result.getString("lib2"));
+                }
                 if (result.getString("acscd").equalsIgnoreCase("0030")) {
                     PARAM.put("ext", result.getString("lib2"));
                 }

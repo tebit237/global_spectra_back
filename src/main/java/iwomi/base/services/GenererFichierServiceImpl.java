@@ -63,11 +63,13 @@ import iwomi.base.objects.GenFile;
 import iwomi.base.objects.GenFileId;
 import iwomi.base.objects.Nomenclature;
 import iwomi.base.objects.ReportDatasGenerated;
+import iwomi.base.objects.ReportFile;
 import iwomi.base.objects.ReportRep;
 import iwomi.base.repositories.GenFileRepository;
 import iwomi.base.repositories.InputWriteRepository;
 import iwomi.base.repositories.NomenclatureRepository;
 import iwomi.base.repositories.ReportDatasGeneratedRepository;
+import iwomi.base.repositories.ReportFileRepository;
 import iwomi.base.repositories.ReportRepRepository;
 import java.io.BufferedReader;
 import java.io.FileOutputStream;
@@ -751,7 +753,7 @@ public class GenererFichierServiceImpl implements GenererFichierServices {
                         try {
                             for (int i = 0; i < fic.getCodeFichier().size(); i++) {
                                 fic.setDate(fic.getArrete().get(fic.getCodeFichier().get(i).getCode()));
-                                service.execute(new GenererFichierServiceImpl.Treatement(fic, i, dropdown, parameters, idOpe));
+                                service.execute(new GenererFichierServiceImpl.Treatement(fic, i, dropdown, parameters, idOpe, r));
                             }
                             service.shutdown();
                             try {
@@ -786,6 +788,8 @@ public class GenererFichierServiceImpl implements GenererFichierServices {
     }
     @Autowired
     LiveReportingServiceS liveReportingServicef;
+    @Autowired
+    ReportFileRepository reportFileRepository;
 
     public class Treatement implements Runnable {
 
@@ -794,13 +798,15 @@ public class GenererFichierServiceImpl implements GenererFichierServices {
         Map<String, String> dropdown;
         Map<String, String> parameters;
         Long idOpe;
+        Statement r;
 
-        public Treatement(GenererFichierForm fic, int i, Map<String, String> dropdown, Map<String, String> parameters, Long idOpe) {
+        public Treatement(GenererFichierForm fic, int i, Map<String, String> dropdown, Map<String, String> parameters, Long idOpe, Statement r) {
             this.fic = fic;
             this.i = i;
             this.dropdown = dropdown;
             this.parameters = parameters;
             this.idOpe = idOpe;
+            this.r = r;
         }
 
         @Override
@@ -809,19 +815,12 @@ public class GenererFichierServiceImpl implements GenererFichierServices {
         }
 
         private void generateFileThread(GenererFichierForm fic, int i, Map<String, String> dropdown) throws NumberFormatException {
-            BufferedWriter writer = null;
-            System.out.println("Treating file : " + fic.getCodeFichier().get(i).getCode());
-            String lineFile = "";
-            String codeFichier = "";
             String fileName = "";
             int CONST = 0;
             int defineFileToSave = 0;
-            Long statut = Long.valueOf(3);
             Long count = Long.valueOf(0);
             Map<String, String> typefile = new HashMap<String, String>();
-            Long nbreLigne = Long.valueOf(7);
             try {
-
                 typefile = reportCalculateService.getType12(fic.getCodeFichier().get(i).getCode());
             } catch (ClassNotFoundException e) {
                 // TODO Auto-generated catch block
@@ -833,742 +832,40 @@ public class GenererFichierServiceImpl implements GenererFichierServices {
                 // TODO Auto-generated catch block
                 e.printStackTrace();
             }
-            try {
-                fileName = getYearMonth2(fic.getDate()) + fic.getCodeFichier().get(i).getCode()
-                        + parameters.get("idetab") + "." + parameters.get("extention");
-                System.out.println("FILE NAME " + fileName);
-            } catch (ParseException ex) {
-                System.out.println("Date (yyyy-MM-dd) Could not be formated " + fic.getDate());
-            }
-            if (typefile.get("result").equals("calculate")) {
-                System.out.println("File " + fic.getCodeFichier().get(i).getCode() + " entering Calculation Type generation");
-                List<ReportRep> report = reportRepRepository.preparedResult12(fic.getCodeFichier().get(i).getCode(), fic.getDate());
-                int Friqunce = (int) Math.ceil(report.size() / 100.0);
-                if (report.size() > 0) {
-                    liveReportingServicef.beginDetailsReportingToTheVue2(idOpe, fic.getCodeFichier().get(i).getCode(), new Long(report.size()));
-                    CONST = 0;
-                    try {
-                        for (int j = 0; j < report.size(); j++) {
-                            if (defineFileToSave == 0) {
-
-                                Path e = null;//
-                                try {
-                                    e = Files.createFile(Paths.get(parameters.get("chemin") + fileName));
-                                } catch (FileAlreadyExistsException ey) {
-                                    e = Paths.get(parameters.get("chemin") + fileName);
-                                }
-                                writer = Files.newBufferedWriter(e, StandardCharsets.UTF_8);
-                                defineFileToSave = 1;
-                                String ActualDate = "";
-                                ActualDate = getDateAtTheGoodformat1(fic.getDate());
-                                lineFile = parameters.get("idetab") + parameters.get("delimiteur")
-                                        + parameters.get("codePays") + parameters.get("delimiteur")
-                                        + parameters.get("status") + parameters.get("delimiteur") + ActualDate
-                                        + parameters.get("delimiteur") + report.get(j).getFichier();
-                                writer.write(lineFile);
-                                writer.newLine();
-                                lineFile = "";
-                            }
-                            codeFichier = fic.getCodeFichier().get(i).getCode();
-                            if (CONST == 0 && (typefile.get("result").equals("calculate") || typefile.get("result").equals("duplicateNoPost"))) {
-                                lineFile += report.get(j).getPost() + ";";
-                            }
-                            if (CONST < Integer.parseInt(dropdown.get(report.get(j).getFichier())) - 2) {
-
-                                if (report.get(j).getValc() != null) {
-                                    if (report.get(j).getValc()
-                                            .equalsIgnoreCase("***")) {
-
-                                        lineFile += ";";
-
-                                    } else {
-                                        lineFile += report.get(j).getValc() + ";";
-
-                                    }
-                                } else if (report.get(j).getValm() != null) {
-
-                                    if (String.valueOf(report.get(j).getValm())
-                                            .equalsIgnoreCase("***")) {
-
-                                        lineFile += ";";
-
-                                    } else {
-                                        lineFile += Math.abs((int) Math.round(report.get(j).getValm())) + ";";
-
-                                    }
-
-                                } else if (report.get(j).getVald() != null) {
-
-                                    if (String.valueOf(report.get(j).getVald())
-                                            .equalsIgnoreCase("***")) {
-
-                                        lineFile += ";";
-
-                                    } else {
-                                        lineFile += report.get(j).getVald() + ";";
-
-                                    }
-
-                                } else if (report.get(j).getValt() != null) {
-                                    if (String.valueOf(report.get(j).getValt())
-                                            .equalsIgnoreCase("***")) {
-
-                                        lineFile += ";";
-
-                                    } else {
-                                        lineFile += report.get(j).getValt() + ";";
-
-                                    }
-
-                                } else {
-
-                                    lineFile += ";";
-
-                                }
-
-                                CONST++;
-
-                            } else {//last like which does not have comer
-
-                                if (report.get(j).getValc() != null) {
-
-                                    if (report.get(j).getValc()
-                                            .equalsIgnoreCase("***")) {
-
-                                        lineFile += "";
-
-                                    } else {
-                                        lineFile += report.get(j).getValc();
-
-                                    }
-
-                                } else if (report.get(j).getValm() != null) {
-
-                                    if (String.valueOf(report.get(j).getValm())
-                                            .equalsIgnoreCase("***")) {
-
-                                        lineFile += "";
-
-                                    } else {
-                                        lineFile += Math.abs((int) Math.round(report.get(j).getValm()));
-
-                                    }
-
-                                } else if (report.get(j).getVald() != null) {
-
-                                    if (String.valueOf(report.get(j).getVald())
-                                            .equalsIgnoreCase("***")) {
-
-                                        lineFile += "";
-
-                                    } else {
-                                        lineFile += report.get(j).getVald();
-
-                                    }
-
-                                } else if (report.get(j).getValt() != null) {
-
-                                    if (String.valueOf(report.get(j).getValt())
-                                            .equalsIgnoreCase("***")) {
-
-                                        lineFile += "";
-
-                                    } else {
-                                        lineFile += report.get(j).getValt();
-
-                                    }
-
-                                } else {
-
-                                    System.out.println("TYPE ERROR .........");
-
-                                }
-
-                                try {
-                                    writer.write(lineFile);
-                                } catch (IOException ex) {
-                                    Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null,
-                                            ex);
-                                }
-                                try {
-                                    writer.newLine();
-                                } catch (IOException ex) {
-                                    Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null,
-                                            ex);
-                                }
-                                count++;
-//                                Double s = Math.ceil(report.size() / 100.0);
-//                                liveReportingServices.detailsReportingToTheVue2(fic.getCodeUnique(), fic.getCodeFichier().get(i).getCode(), s.longValue());
-                                if (j % Friqunce == 0) {
-                                    liveReportingServices.detailsReportingToTheVue3(fic.getCodeUnique(), fic.getCodeFichier().get(i).getCode(), new Long(Friqunce));
-                                }
-                                CONST = 0;
-                                lineFile = "";
-                            }
-                        }
-                        defineFileToSave = 0;
-                        writer.close();
-                        defineFileToSave = 0;
-                        statut = Long.valueOf(1);
-                        liveReportingServices.endDetailsReportingToTheVue2(fic.getCodeUnique(), fic.getCodeFichier().get(i).getCode(), 1L, new Long(report.size()), new Long(report.size()));
-                        nombreOpeTraite++;
-                        quotien = Long.valueOf(1);
-                        count = Long.valueOf(0);
-
-                    } catch (IOException ex) {
-                        Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
-                    } catch (ParseException ex) {
-                        Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
-                    }
-                } else {
-                    System.out.println("no data Collected for :" + fic.getCodeFichier().get(i).getCode());
-                    liveReportingServicef.beginDetailsReportingToTheVue2(idOpe, fic.getCodeFichier().get(i).getCode(), 1L);
-                    Path e = null;//
-                    try {
-                        try {
-                            e = Files.createFile(Paths.get(parameters.get("chemin") + fileName));
-                        } catch (FileAlreadyExistsException ey) {
-                            e = Paths.get(parameters.get("chemin") + fileName);
-                        }
-                        writer = Files.newBufferedWriter(e, StandardCharsets.ISO_8859_1);
-                        defineFileToSave = 0;
-                        String ActualDate = "";
-                        ActualDate = getDateAtTheGoodformat1(fic.getDate());
-                        lineFile = parameters.get("idetab") + parameters.get("delimiteur")
-                                + parameters.get("codePays") + parameters.get("delimiteur")
-                                + parameters.get("status") + parameters.get("delimiteur") + ActualDate
-                                + parameters.get("delimiteur") + fic.getCodeFichier().get(i).getCode();
-                        writer.write(lineFile);
-                        writer.close();
-
-                        liveReportingServices.endDetailsReportingToTheVue2(fic.getCodeUnique(), fic.getCodeFichier().get(i).getCode(), 1L, 1L, 1L);
-                    } catch (Exception ex) {
-                        System.out.println(ex.getMessage());
-                    }
-
+            if (parameters.get("typeReporting").equalsIgnoreCase("2")) {
+                try {
+                    fileName = getYearMonth2(fic.getDate()) + fic.getCodeFichier().get(i).getCode()
+                            + parameters.get("idetab") + "." + parameters.get("extention");
+                    System.out.println("FILE NAME " + fileName);
+                } catch (ParseException ex) {
+                    System.out.println("Date (yyyy-MM-dd) Could not be formated " + fic.getDate());
                 }
-            } else if (typefile.get("result").equals("duplicateNoPost")) {
-                System.out.println("File " + fic.getCodeFichier().get(i).getCode() + " entering duplicateNoPost");
-                List<ReportRep> report = reportRepRepository.preparedResult12(fic.getCodeFichier().get(i).getCode(), fic.getDate());
-                if (report.size() > 0) {
-                    liveReportingServicef.beginDetailsReportingToTheVue2(idOpe, fic.getCodeFichier().get(i).getCode(), new Long(report.size()));
-                    int Friqunce = (int) Math.ceil(report.size() / 100.0);
-                    CONST = 0;
-                    try {
-                        for (int j = 0; j < report.size(); j++) {
-                            if (defineFileToSave == 0) {
 
-                                Path e = null;//
-                                try {
-                                    e = Files.createFile(Paths.get(parameters.get("chemin") + fileName));
-                                } catch (FileAlreadyExistsException ey) {
-                                    e = Paths.get(parameters.get("chemin") + fileName);
-                                }
-                                writer = Files.newBufferedWriter(e, StandardCharsets.UTF_8);
-                                defineFileToSave = 1;
-                                String ActualDate = "";
-                                ActualDate = getDateAtTheGoodformat1(fic.getDate());
-                                lineFile = parameters.get("idetab") + parameters.get("delimiteur")
-                                        + parameters.get("codePays") + parameters.get("delimiteur")
-                                        + parameters.get("status") + parameters.get("delimiteur") + ActualDate
-                                        + parameters.get("delimiteur") + report.get(j).getFichier();
-                                writer.write(lineFile);
-                                writer.newLine();
-                                lineFile = "";
-                            }
-                            codeFichier = fic.getCodeFichier().get(i).getCode();
-                            if (CONST == 0 && (typefile.get("result").equals("calculate") || typefile.get("result").equals("duplicateNoPost"))) {
-
-                                lineFile += report.get(j).getPost() + ";";
-                            }
-                            if (CONST < Integer.parseInt(dropdown.get(report.get(j).getFichier())) - (InputWriteRepository.existsByFichi(report.get(j).getFichier()) ? 2 : 1)) {
-
-                                if (report.get(j).getValc() != null) {
-                                    if (report.get(j).getValc()
-                                            .equalsIgnoreCase("***")) {
-
-                                        lineFile += ";";
-
-                                    } else {
-                                        lineFile += report.get(j).getValc() + ";";
-
-                                    }
-                                } else if (report.get(j).getValm() != null) {
-
-                                    if (String.valueOf(report.get(j).getValm())
-                                            .equalsIgnoreCase("***")) {
-
-                                        lineFile += ";";
-
-                                    } else {
-                                        lineFile += Math.abs((int) Math.round(report.get(j).getValm())) + ";";
-
-                                    }
-
-                                } else if (report.get(j).getVald() != null) {
-
-                                    if (String.valueOf(report.get(j).getVald())
-                                            .equalsIgnoreCase("***")) {
-
-                                        lineFile += ";";
-
-                                    } else {
-                                        lineFile += report.get(j).getVald() + ";";
-
-                                    }
-
-                                } else if (report.get(j).getValt() != null) {
-                                    if (String.valueOf(report.get(j).getValt())
-                                            .equalsIgnoreCase("***")) {
-
-                                        lineFile += ";";
-
-                                    } else {
-                                        lineFile += report.get(j).getValt() + ";";
-
-                                    }
-
-                                } else {
-
-                                    lineFile += ";";
-
-                                }
-                                CONST++;
-                            } else {//last like which does not have comer
-                                System.out.println("verify last : " + report.get(j).getCol());
-                                if (report.get(j).getValc() != null) {
-
-                                    if (report.get(j).getValc()
-                                            .equalsIgnoreCase("***")) {
-
-                                        lineFile += "";
-
-                                    } else {
-                                        lineFile += report.get(j).getValc();
-
-                                    }
-
-                                } else if (report.get(j).getValm() != null) {
-
-                                    if (String.valueOf(report.get(j).getValm())
-                                            .equalsIgnoreCase("***")) {
-
-                                        lineFile += "";
-
-                                    } else {
-//	                            	lineFile+=reportDatasGenerated2.get(j).getValm();
-                                        lineFile += Math.abs((int) Math.round(report.get(j).getValm()));
-
-                                    }
-
-                                } else if (report.get(j).getVald() != null) {
-
-                                    if (String.valueOf(report.get(j).getVald())
-                                            .equalsIgnoreCase("***")) {
-
-                                        lineFile += "";
-
-                                    } else {
-                                        lineFile += report.get(j).getVald();
-
-                                    }
-
-                                } else if (report.get(j).getValt() != null) {
-
-                                    if (String.valueOf(report.get(j).getValt())
-                                            .equalsIgnoreCase("***")) {
-
-                                        lineFile += "";
-
-                                    } else {
-                                        lineFile += report.get(j).getValt();
-
-                                    }
-
-                                } else {
-
-                                    System.out.println("TYPE ERROR .........");
-
-                                }
-
-                                try {
-                                    writer.write(lineFile);
-                                } catch (IOException ex) {
-                                    Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null,
-                                            ex);
-                                }
-                                try {
-                                    writer.newLine();
-                                } catch (IOException ex) {
-                                    Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null,
-                                            ex);
-                                }
-                                count++;
-//                                Double s = Math.ceil(report.size() / 100.0);
-//                                liveReportingServices.detailsReportingToTheVue2(fic.getCodeUnique(), fic.getCodeFichier().get(i).getCode(), s.longValue());
-                                if (j % Friqunce == 0) {
-                                    liveReportingServices.detailsReportingToTheVue3(fic.getCodeUnique(), fic.getCodeFichier().get(i).getCode(), new Long(Friqunce));
-                                }
-                                CONST = 0;
-                                lineFile = "";
-                            }
-                        }
-                        defineFileToSave = 0;
-                        writer.close();
-                        defineFileToSave = 0;
-                        statut = Long.valueOf(1);
-                        liveReportingServices.endDetailsReportingToTheVue2(fic.getCodeUnique(), fic.getCodeFichier().get(i).getCode(), 1L, new Long(report.size()), new Long(report.size()));
-                    } catch (IOException ex) {
-                        Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
-                    } catch (ParseException ex) {
-                        Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
-                    }
-                } else {
-                    liveReportingServicef.beginDetailsReportingToTheVue2(idOpe, fic.getCodeFichier().get(i).getCode(), 1L);
-                    Path e = null;//
-                    try {
-                        try {
-                            e = Files.createFile(Paths.get(parameters.get("chemin") + fileName));
-                        } catch (FileAlreadyExistsException ey) {
-                            e = Paths.get(parameters.get("chemin") + fileName);
-                        }
-                        writer = Files.newBufferedWriter(e, StandardCharsets.ISO_8859_1);
-                        defineFileToSave = 0;
-
-                        String ActualDate = "";
-                        ActualDate = getDateAtTheGoodformat1(fic.getDate());
-                        lineFile = parameters.get("idetab") + parameters.get("delimiteur")
-                                + parameters.get("codePays") + parameters.get("delimiteur")
-                                + parameters.get("status") + parameters.get("delimiteur") + ActualDate
-                                + parameters.get("delimiteur") + fic.getCodeFichier().get(i).getCode();
-                        System.out.println("the file name is :");
-                        writer.write(lineFile);
-                        writer.close();
-                        System.out.println("no data Collected for :" + fic.getCodeFichier().get(i).getCode());
-                        liveReportingServices.endDetailsReportingToTheVue2(fic.getCodeUnique(), fic.getCodeFichier().get(i).getCode(), 1L, 1L, 1L);
-
-                    } catch (Exception ex) {
-                        System.out.println("it was not property closed : " + ex.getLocalizedMessage());
-                    }
-
+                if (typefile.get("result").equals("calculate")) {
+                    calculation(fic, i, CONST, defineFileToSave, fileName, typefile, dropdown, count);
+                } else if (typefile.get("result").equals("duplicateNoPost")) {
+                    duplicatePostFile(fic, i, CONST, defineFileToSave, fileName, typefile, dropdown, count);
+                } else if (typefile.get("result").equals("duplicate")) {
+                    duplicateFile(fic, i, CONST, defineFileToSave, fileName, typefile, dropdown, count);
+                } else if (typefile.get("result").equals("sql")) {
+                    fileName = sqlTypeFile(fic, i, defineFileToSave, fileName, typefile, count);
                 }
-            } else if (typefile.get("result").equals("duplicate")) {
-                List<ReportRep> report = reportRepRepository.findFichierDar(fic.getCodeFichier().get(i).getCode(), fic.getDate());
-                if (report.size() > 0) {
-                    liveReportingServicef.beginDetailsReportingToTheVue2(idOpe, fic.getCodeFichier().get(i).getCode(), new Long(report.size()));
-                    int Friqunce = (int) Math.ceil(report.size() / 100.0);
+            } else {
+                ManageExcelFiles se = new ManageExcelFiles();
+                try {
+                    Path file = se.sesamGeneration(fic.getCodeFichier().get(i).getCode(), r);
 
-                    CONST = 0;
-                    try {
-                        for (int j = 0; j < report.size(); j++) {
-                            if (defineFileToSave == 0) {
-
-                                Path e = null;//
-                                try {
-                                    e = Files.createFile(Paths.get(parameters.get("chemin") + fileName));
-                                } catch (FileAlreadyExistsException ey) {
-                                    e = Paths.get(parameters.get("chemin") + fileName);
-                                }
-                                writer = Files.newBufferedWriter(e, StandardCharsets.UTF_8);
-                                defineFileToSave = 1;
-                                String ActualDate = "";
-                                ActualDate = getDateAtTheGoodformat1(fic.getDate());
-                                lineFile = parameters.get("idetab") + parameters.get("delimiteur")
-                                        + parameters.get("codePays") + parameters.get("delimiteur")
-                                        + parameters.get("status") + parameters.get("delimiteur") + ActualDate
-                                        + parameters.get("delimiteur") + report.get(j).getFichier();
-                                writer.write(lineFile);
-                                writer.newLine();
-                                lineFile = "";
-                            }
-                            codeFichier = fic.getCodeFichier().get(i).getCode();
-                            if (CONST == 0 && (typefile.get("result").equals("calculate") || typefile.get("result").equals("duplicateNoPost"))) {
-                                lineFile += report.get(j).getPost() + ";";
-                            }
-                            if (CONST < Integer.parseInt(dropdown.get(report.get(j).getFichier())) - 1) {
-
-                                if (report.get(j).getValc() != null) {
-                                    if (report.get(j).getValc()
-                                            .equalsIgnoreCase("***")) {
-
-                                        lineFile += ";";
-
-                                    } else {
-                                        lineFile += report.get(j).getValc() + ";";
-
-                                    }
-                                } else if (report.get(j).getValm() != null) {
-
-                                    if (String.valueOf(report.get(j).getValm())
-                                            .equalsIgnoreCase("***")) {
-
-                                        lineFile += ";";
-
-                                    } else {
-                                        lineFile += Math.abs((int) Math.round(report.get(j).getValm())) + ";";
-
-                                    }
-
-                                } else if (report.get(j).getVald() != null) {
-
-                                    if (String.valueOf(report.get(j).getVald())
-                                            .equalsIgnoreCase("***")) {
-
-                                        lineFile += ";";
-
-                                    } else {
-                                        lineFile += report.get(j).getVald() + ";";
-
-                                    }
-
-                                } else if (report.get(j).getValt() != null) {
-                                    if (String.valueOf(report.get(j).getValt())
-                                            .equalsIgnoreCase("***")) {
-
-                                        lineFile += ";";
-
-                                    } else {
-                                        lineFile += report.get(j).getValt() + ";";
-
-                                    }
-
-                                } else {
-
-                                    lineFile += ";";
-
-                                }
-
-                                CONST++;
-
-                            } else {//last like which does not have comer
-
-                                if (report.get(j).getValc() != null) {
-
-                                    if (report.get(j).getValc()
-                                            .equalsIgnoreCase("***")) {
-
-                                        lineFile += "";
-
-                                    } else {
-                                        lineFile += report.get(j).getValc();
-
-                                    }
-
-                                } else if (report.get(j).getValm() != null) {
-
-                                    if (String.valueOf(report.get(j).getValm())
-                                            .equalsIgnoreCase("***")) {
-
-                                        lineFile += "";
-
-                                    } else {
-                                        lineFile += Math.abs((int) Math.round(report.get(j).getValm()));
-
-                                    }
-
-                                } else if (report.get(j).getVald() != null) {
-
-                                    if (String.valueOf(report.get(j).getVald())
-                                            .equalsIgnoreCase("***")) {
-
-                                        lineFile += "";
-
-                                    } else {
-                                        lineFile += report.get(j).getVald();
-
-                                    }
-
-                                } else if (report.get(j).getValt() != null) {
-
-                                    if (String.valueOf(report.get(j).getValt())
-                                            .equalsIgnoreCase("***")) {
-
-                                        lineFile += "";
-
-                                    } else {
-                                        lineFile += report.get(j).getValt();
-
-                                    }
-
-                                } else {
-
-                                    System.out.println("TYPE ERROR .........");
-                                    lineFile += "";
-
-                                }
-
-                                try {
-                                    writer.write(lineFile);
-                                } catch (IOException ex) {
-                                    Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null,
-                                            ex);
-                                }
-                                try {
-                                    writer.newLine();
-                                } catch (IOException ex) {
-                                    Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null,
-                                            ex);
-                                }
-                                count++;
-//                                Double s = Math.ceil(report.size() / 100.0);
-//                                liveReportingServices.detailsReportingToTheVue2(fic.getCodeUnique(), fic.getCodeFichier().get(i).getCode(), s.longValue());
-                                if (j % Friqunce == 0) {
-                                    liveReportingServices.detailsReportingToTheVue3(fic.getCodeUnique(), fic.getCodeFichier().get(i).getCode(), new Long(Friqunce));
-                                }
-                                CONST = 0;
-                                lineFile = "";
-                            }
-                        }
-                        defineFileToSave = 0;
-                        writer.close();
-                        defineFileToSave = 0;
-                        statut = Long.valueOf(1);
-                        liveReportingServices.endDetailsReportingToTheVue2(fic.getCodeUnique(), fic.getCodeFichier().get(i).getCode(), 1L, new Long(report.size()), new Long(report.size()));
-                        nombreOpeTraite++;
-                        quotien = Long.valueOf(1);
-                        count = Long.valueOf(0);
-
-                    } catch (IOException ex) {
-                        Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
-                    } catch (ParseException ex) {
-                        Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
-                    }
-                } else {
-                    liveReportingServicef.beginDetailsReportingToTheVue2(idOpe, fic.getCodeFichier().get(i).getCode(), 1L);
-
-                    Path e = null;//
-                    try {
-                        try {
-                            e = Files.createFile(Paths.get(parameters.get("chemin") + fileName));
-                        } catch (FileAlreadyExistsException ey) {
-                            e = Paths.get(parameters.get("chemin") + fileName);
-                        }
-                        writer = Files.newBufferedWriter(e, StandardCharsets.ISO_8859_1);
-                        defineFileToSave = 0;
-                        String ActualDate = "";
-                        ActualDate = getDateAtTheGoodformat1(fic.getDate());
-                        lineFile = parameters.get("idetab") + parameters.get("delimiteur")
-                                + parameters.get("codePays") + parameters.get("delimiteur")
-                                + parameters.get("status") + parameters.get("delimiteur") + ActualDate
-                                + parameters.get("delimiteur") + fic.getCodeFichier().get(i).getCode();
-//                    System.out.println("the file name is :");
-                        writer.write(lineFile);
-                        writer.close();
-                        liveReportingServices.endDetailsReportingToTheVue2(fic.getCodeUnique(), fic.getCodeFichier().get(i).getCode(), 1L, 1L, 1L);
-
-                    } catch (Exception ex) {
-                        System.out.println(ex.getMessage());
-                    }
-
+                } catch (Exception ex) {
+                    Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
                 }
-            } else if (typefile.get("result").equals("sql")) {
-                List<SqlFileType> reportDatasGenerated3 = sqlFileTypeRepository.findSqlFileTypeByDarAndFichi(fic.getDate(),
-                        fic.getCodeFichier().get(i).getCode());
-                if (reportDatasGenerated3.size() > 0) {
-                    liveReportingServicef.beginDetailsReportingToTheVue2(idOpe, fic.getCodeFichier().get(i).getCode(), new Long(reportDatasGenerated3.size()));
-                    int Friqunce = (int) Math.ceil(reportDatasGenerated3.size() / 100.0);
-                    CONST = 0;
-                    try {
-                        FileOutputStream fileOutputStream = null;
-                        for (int j = 0; j < reportDatasGenerated3.size(); j++) {
-                            if (defineFileToSave == 0) {
-                                try {
-                                    fileName = getYearMonth2(fic.getDate()) + reportDatasGenerated3.get(j).getFichi()
-                                            + parameters.get("idetab") + "." + parameters.get("extention");
-                                    System.out.println("FILE NAME " + fileName);
-                                } catch (ParseException ex) {
-                                    Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null,
-                                            ex);
-                                }
-                                Path e = null;//
-                                try {
-                                    e = Files.createFile(Paths.get(parameters.get("chemin") + fileName));
-                                } catch (FileAlreadyExistsException ey) {
-                                    e = Paths.get(parameters.get("chemin") + fileName);
-                                }
-                                File file = new File(parameters.get("chemin") + fileName);
-                                fileOutputStream = new FileOutputStream(file);
-//                            writer = Files.newBufferedWriter(e, StandardCharsets.ISO_8859_1);
-                                defineFileToSave = 1;
-                                String ActualDate = "";
-                                ActualDate = getDateAtTheGoodformat1(fic.getDate());
-                                lineFile = parameters.get("idetab") + parameters.get("delimiteur")
-                                        + parameters.get("codePays") + parameters.get("delimiteur")
-                                        + parameters.get("status") + parameters.get("delimiteur") + ActualDate
-                                        + parameters.get("delimiteur") + reportDatasGenerated3.get(j).getFichi();
-//                            writer.write(lineFile);
-                                fileOutputStream.write(lineFile.getBytes(StandardCharsets.UTF_8));
-                                fileOutputStream.write(10);
-//                            writer.newLine();
-                                lineFile = "";
-                            }
-                            codeFichier = fic.getCodeFichier().get(i).getCode();
-                            int t = Integer.parseInt(typefile.get("size"));
-                            lineFile = "";
-                            for (int p = 1; p <= t; p++) {
-
-                                lineFile += (reportDatasGenerated3.get(j).cellExtra(p) == null ? "" : reportDatasGenerated3.get(j).cellExtra(p)) + (p == t ? "" : ";");
-                            }
-                            fileOutputStream.write(lineFile.getBytes(StandardCharsets.UTF_8));
-                            fileOutputStream.write(10);
-//                        try {
-//                            writer.write(lineFile);
-//                        } catch (IOException ex) {
-//                            Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
-//                        }
-//                        try {
-//                            writer.newLine();
-//                        } catch (IOException ex) {
-//                            Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
-//                        }
-                            if (j % 10000 == 0) {
-                                System.out.println("the is no change " + count);
-                                fileOutputStream.flush();
-                            }
-//                            Double s = Math.ceil(reportDatasGenerated3.size() / 100.0);
-//                            liveReportingServices.detailsReportingToTheVue2(fic.getCodeUnique(), fic.getCodeFichier().get(i).getCode(), s.longValue());
-                            if (j % Friqunce == 0) {
-                                liveReportingServices.detailsReportingToTheVue3(fic.getCodeUnique(), fic.getCodeFichier().get(i).getCode(), new Long(Friqunce));
-                            }
-                            CONST = 0;
-                            lineFile = "";
-                        }
-                        defineFileToSave = 0;
-                        fileOutputStream.close();
-                        statut = Long.valueOf(1);
-                        liveReportingServices.endDetailsReportingToTheVue2(fic.getCodeUnique(), fic.getCodeFichier().get(i).getCode(), 1L, new Long(reportDatasGenerated3.size()), new Long(reportDatasGenerated3.size()));
-                        nombreOpeTraite++;
-                        quotien = Long.valueOf(1);
-                        count = Long.valueOf(0);
-                    } catch (IOException ex) {
-                        Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
-                    } catch (ParseException ex) {
-                        Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
-                    }
-                } else {
-                    liveReportingServicef.beginDetailsReportingToTheVue2(idOpe, fic.getCodeFichier().get(i).getCode(), 1L);
-
-                    Path e = null;//
-                    try {
-                        try {
-                            e = Files.createFile(Paths.get(parameters.get("chemin") + fileName));
-                        } catch (FileAlreadyExistsException ey) {
-                            e = Paths.get(parameters.get("chemin") + fileName);
-                        }
-                        writer = Files.newBufferedWriter(e, StandardCharsets.ISO_8859_1);
-                        defineFileToSave = 0;
-                        String ActualDate = "";
-                        ActualDate = getDateAtTheGoodformat1(fic.getDate());
-                        lineFile = parameters.get("idetab") + parameters.get("delimiteur")
-                                + parameters.get("codePays") + parameters.get("delimiteur")
-                                + parameters.get("status") + parameters.get("delimiteur") + ActualDate
-                                + parameters.get("delimiteur") + fic.getCodeFichier().get(i).getCode();
-                        writer.write(lineFile);
-                        writer.close();
-                        liveReportingServices.endDetailsReportingToTheVue2(fic.getCodeUnique(), fic.getCodeFichier().get(i).getCode(), 1L, 1L, 1L);
-                    } catch (Exception ex) {
-                        Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
-                    }
+                if (typefile.get("result").equals("calculate")) {
+                    calculationSesame(fic, i, CONST, defineFileToSave, fileName, typefile, dropdown, count);
+                } else if (typefile.get("result").equals("duplicateNoPost")) {
+                    duplicatePostFile(fic, i, CONST, defineFileToSave, fileName, typefile, dropdown, count);
+                } else if (typefile.get("result").equals("duplicate")) {
+                    duplicateFile(fic, i, CONST, defineFileToSave, fileName, typefile, dropdown, count);
+                } else if (typefile.get("result").equals("sql")) {
+                    fileName = sqlTypeFile(fic, i, defineFileToSave, fileName, typefile, count);
                 }
             }
             GenFile fu;
@@ -1586,8 +883,751 @@ public class GenererFichierServiceImpl implements GenererFichierServices {
             }
         }
 
+        private String sqlTypeFile(GenererFichierForm fic1, int i1, int defineFileToSave1, String fileName1, Map<String, String> typefile, Long count1) throws NumberFormatException {
+            int CONST;
+            String lineFile;
+            String codeFichier;
+            Long statut;
+            BufferedWriter writer;
+            List<SqlFileType> reportDatasGenerated3 = sqlFileTypeRepository.findSqlFileTypeByDarAndFichi(fic1.getDate(), fic1.getCodeFichier().get(i1).getCode());
+            if (reportDatasGenerated3.size() > 0) {
+                liveReportingServicef.beginDetailsReportingToTheVue2(idOpe, fic1.getCodeFichier().get(i1).getCode(), new Long(reportDatasGenerated3.size()));
+                int Friqunce = (int) Math.ceil(reportDatasGenerated3.size() / 100.0);
+                CONST = 0;
+                try {
+                    FileOutputStream fileOutputStream = null;
+                    for (int j = 0; j < reportDatasGenerated3.size(); j++) {
+                        if (defineFileToSave1 == 0) {
+                            try {
+                                fileName1 = getYearMonth2(fic1.getDate()) + reportDatasGenerated3.get(j).getFichi() + parameters.get("idetab") + "." + parameters.get("extention");
+                                System.out.println("FILE NAME " + fileName1);
+                            } catch (ParseException ex) {
+                                Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null,
+                                        ex);
+                            }
+                            Path e = null;//
+                            try {
+                                e = Files.createFile(Paths.get(parameters.get("chemin") + fileName1));
+                            } catch (FileAlreadyExistsException ey) {
+                                e = Paths.get(parameters.get("chemin") + fileName1);
+                            }
+                            File file = new File(parameters.get("chemin") + fileName1);
+                            fileOutputStream = new FileOutputStream(file);
+//                            writer = Files.newBufferedWriter(e, StandardCharsets.ISO_8859_1);
+                            defineFileToSave1 = 1;
+                            String ActualDate = "";
+                            ActualDate = getDateAtTheGoodformat1(fic1.getDate());
+                            lineFile = parameters.get("idetab") + parameters.get("delimiteur")
+                                    + parameters.get("codePays") + parameters.get("delimiteur")
+                                    + parameters.get("status") + parameters.get("delimiteur") + ActualDate
+                                    + parameters.get("delimiteur") + reportDatasGenerated3.get(j).getFichi();
+                            //                            writer.write(lineFile);
+                            fileOutputStream.write(lineFile.getBytes(StandardCharsets.UTF_8));
+                            fileOutputStream.write(10);
+                            //                            writer.newLine();
+                            lineFile = "";
+                        }
+                        codeFichier = fic1.getCodeFichier().get(i1).getCode();
+                        int t = Integer.parseInt(typefile.get("size"));
+                        lineFile = "";
+                        for (int p = 1; p <= t; p++) {
+
+                            lineFile += (reportDatasGenerated3.get(j).cellExtra(p) == null ? "" : reportDatasGenerated3.get(j).cellExtra(p)) + (p == t ? "" : ";");
+                        }
+                        fileOutputStream.write(lineFile.getBytes(StandardCharsets.UTF_8));
+                        fileOutputStream.write(10);
+//                        try {
+//                            writer.write(lineFile);
+//                        } catch (IOException ex) {
+//                            Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
+//                        }
+//                        try {
+//                            writer.newLine();
+//                        } catch (IOException ex) {
+//                            Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
+//                        }
+                        if (j % 10000 == 0) {
+                            System.out.println("the is no change " + count1);
+                            fileOutputStream.flush();
+                        }
+//                            Double s = Math.ceil(reportDatasGenerated3.size() / 100.0);
+//                            liveReportingServices.detailsReportingToTheVue2(fic.getCodeUnique(), fic.getCodeFichier().get(i).getCode(), s.longValue());
+                        if (j % Friqunce == 0) {
+                            liveReportingServices.detailsReportingToTheVue3(fic1.getCodeUnique(), fic1.getCodeFichier().get(i1).getCode(), new Long(Friqunce));
+                        }
+                        CONST = 0;
+                        lineFile = "";
+                    }
+                    defineFileToSave1 = 0;
+                    fileOutputStream.close();
+                    statut = Long.valueOf(1);
+                    liveReportingServices.endDetailsReportingToTheVue2(fic1.getCodeUnique(), fic1.getCodeFichier().get(i1).getCode(), 1L, new Long(reportDatasGenerated3.size()), new Long(reportDatasGenerated3.size()));
+                    nombreOpeTraite++;
+                    quotien = Long.valueOf(1);
+                    count1 = Long.valueOf(0);
+                } catch (IOException ex) {
+                    Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
+                } catch (ParseException ex) {
+                    Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            } else {
+                liveReportingServicef.beginDetailsReportingToTheVue2(idOpe, fic1.getCodeFichier().get(i1).getCode(), 1L);
+                Path e = null;//
+                try {
+                    try {
+                        e = Files.createFile(Paths.get(parameters.get("chemin") + fileName1));
+                    } catch (FileAlreadyExistsException ey) {
+                        e = Paths.get(parameters.get("chemin") + fileName1);
+                    }
+                    writer = Files.newBufferedWriter(e, StandardCharsets.ISO_8859_1);
+                    defineFileToSave1 = 0;
+                    String ActualDate = "";
+                    ActualDate = getDateAtTheGoodformat1(fic1.getDate());
+                    lineFile = parameters.get("idetab") + parameters.get("delimiteur")
+                            + parameters.get("codePays") + parameters.get("delimiteur")
+                            + parameters.get("status") + parameters.get("delimiteur") + ActualDate
+                            + parameters.get("delimiteur") + fic1.getCodeFichier().get(i1).getCode();
+                    writer.write(lineFile);
+                    writer.close();
+                    liveReportingServices.endDetailsReportingToTheVue2(fic1.getCodeUnique(), fic1.getCodeFichier().get(i1).getCode(), 1L, 1L, 1L);
+                } catch (Exception ex) {
+                    Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            }
+            return fileName;
+        }
+
+        private void duplicateFile(GenererFichierForm fic1, int i1, int CONST1, int defineFileToSave1, String fileName1, Map<String, String> typefile, Map<String, String> dropdown1, Long count1) throws NumberFormatException {
+            BufferedWriter writer = null;
+            String lineFile = "";
+            String codeFichier;
+            Long statut;
+            List<ReportRep> report = reportRepRepository.findFichierDar(fic1.getCodeFichier().get(i1).getCode(), fic1.getDate());
+            if (report.size() > 0) {
+                liveReportingServicef.beginDetailsReportingToTheVue2(idOpe, fic1.getCodeFichier().get(i1).getCode(), new Long(report.size()));
+                int Friqunce = (int) Math.ceil(report.size() / 100.0);
+                CONST1 = 0;
+                try {
+                    for (int j = 0; j < report.size(); j++) {
+                        if (defineFileToSave1 == 0) {
+                            Path e = null;//
+                            try {
+                                e = Files.createFile(Paths.get(parameters.get("chemin") + fileName1));
+                            } catch (FileAlreadyExistsException ey) {
+                                e = Paths.get(parameters.get("chemin") + fileName1);
+                            }
+                            writer = Files.newBufferedWriter(e, StandardCharsets.UTF_8);
+                            defineFileToSave1 = 1;
+                            String ActualDate = "";
+                            ActualDate = getDateAtTheGoodformat1(fic1.getDate());
+                            lineFile = parameters.get("idetab") + parameters.get("delimiteur")
+                                    + parameters.get("codePays") + parameters.get("delimiteur")
+                                    + parameters.get("status") + parameters.get("delimiteur") + ActualDate
+                                    + parameters.get("delimiteur") + report.get(j).getFichier();
+                            writer.write(lineFile);
+                            writer.newLine();
+                            lineFile = "";
+                        }
+                        codeFichier = fic1.getCodeFichier().get(i1).getCode();
+                        if (CONST1 == 0 && (typefile.get("result").equals("calculate") || typefile.get("result").equals("duplicateNoPost"))) {
+                            lineFile += report.get(j).getPost() + ";";
+                        }
+                        if (CONST1 < Integer.parseInt(dropdown1.get(report.get(j).getFichier())) - 1) {
+                            if (report.get(j).getValc() != null) {
+                                if (report.get(j).getValc()
+                                        .equalsIgnoreCase("***")) {
+
+                                    lineFile += ";";
+
+                                } else {
+                                    lineFile += report.get(j).getValc() + ";";
+
+                                }
+                            } else if (report.get(j).getValm() != null) {
+
+                                if (String.valueOf(report.get(j).getValm())
+                                        .equalsIgnoreCase("***")) {
+
+                                    lineFile += ";";
+
+                                } else {
+                                    lineFile += Math.abs((int) Math.round(report.get(j).getValm())) + ";";
+
+                                }
+
+                            } else if (report.get(j).getVald() != null) {
+
+                                if (String.valueOf(report.get(j).getVald())
+                                        .equalsIgnoreCase("***")) {
+
+                                    lineFile += ";";
+
+                                } else {
+                                    lineFile += report.get(j).getVald() + ";";
+
+                                }
+
+                            } else if (report.get(j).getValt() != null) {
+                                if (String.valueOf(report.get(j).getValt())
+                                        .equalsIgnoreCase("***")) {
+
+                                    lineFile += ";";
+
+                                } else {
+                                    lineFile += report.get(j).getValt() + ";";
+
+                                }
+
+                            } else {
+
+                                lineFile += ";";
+
+                            }
+                            CONST1++;
+                        } else {
+                            //last like which does not have comer
+
+                            if (report.get(j).getValc() != null) {
+
+                                if (report.get(j).getValc()
+                                        .equalsIgnoreCase("***")) {
+
+                                    lineFile += "";
+
+                                } else {
+                                    lineFile += report.get(j).getValc();
+
+                                }
+
+                            } else if (report.get(j).getValm() != null) {
+
+                                if (String.valueOf(report.get(j).getValm())
+                                        .equalsIgnoreCase("***")) {
+
+                                    lineFile += "";
+
+                                } else {
+                                    lineFile += Math.abs((int) Math.round(report.get(j).getValm()));
+
+                                }
+
+                            } else if (report.get(j).getVald() != null) {
+
+                                if (String.valueOf(report.get(j).getVald())
+                                        .equalsIgnoreCase("***")) {
+
+                                    lineFile += "";
+
+                                } else {
+                                    lineFile += report.get(j).getVald();
+
+                                }
+
+                            } else if (report.get(j).getValt() != null) {
+
+                                if (String.valueOf(report.get(j).getValt())
+                                        .equalsIgnoreCase("***")) {
+
+                                    lineFile += "";
+
+                                } else {
+                                    lineFile += report.get(j).getValt();
+
+                                }
+
+                            } else {
+
+                                System.out.println("TYPE ERROR .........");
+                                lineFile += "";
+
+                            }
+                            try {
+                                writer.write(lineFile);
+                            } catch (IOException ex) {
+                                Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null,
+                                        ex);
+                            }
+                            try {
+                                writer.newLine();
+                            } catch (IOException ex) {
+                                Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null,
+                                        ex);
+                            }
+                            count1++;
+//                                Double s = Math.ceil(report.size() / 100.0);
+//                                liveReportingServices.detailsReportingToTheVue2(fic.getCodeUnique(), fic.getCodeFichier().get(i).getCode(), s.longValue());
+                            if (j % Friqunce == 0) {
+                                liveReportingServices.detailsReportingToTheVue3(fic1.getCodeUnique(), fic1.getCodeFichier().get(i1).getCode(), new Long(Friqunce));
+                            }
+                            CONST1 = 0;
+                            lineFile = "";
+                        }
+                    }
+                    defineFileToSave1 = 0;
+                    writer.close();
+                    defineFileToSave1 = 0;
+                    statut = Long.valueOf(1);
+                    liveReportingServices.endDetailsReportingToTheVue2(fic1.getCodeUnique(), fic1.getCodeFichier().get(i1).getCode(), 1L, new Long(report.size()), new Long(report.size()));
+                    nombreOpeTraite++;
+                    quotien = Long.valueOf(1);
+                    count1 = Long.valueOf(0);
+                } catch (IOException ex) {
+                    Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
+                } catch (ParseException ex) {
+                    Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            } else {
+                liveReportingServicef.beginDetailsReportingToTheVue2(idOpe, fic1.getCodeFichier().get(i1).getCode(), 1L);
+                Path e = null;//
+                try {
+                    try {
+                        e = Files.createFile(Paths.get(parameters.get("chemin") + fileName1));
+                    } catch (FileAlreadyExistsException ey) {
+                        e = Paths.get(parameters.get("chemin") + fileName1);
+                    }
+                    writer = Files.newBufferedWriter(e, StandardCharsets.ISO_8859_1);
+                    defineFileToSave1 = 0;
+                    String ActualDate = "";
+                    ActualDate = getDateAtTheGoodformat1(fic1.getDate());
+                    lineFile = parameters.get("idetab") + parameters.get("delimiteur")
+                            + parameters.get("codePays") + parameters.get("delimiteur")
+                            + parameters.get("status") + parameters.get("delimiteur") + ActualDate
+                            + parameters.get("delimiteur") + fic1.getCodeFichier().get(i1).getCode();
+                    //                    System.out.println("the file name is :");
+                    writer.write(lineFile);
+                    writer.close();
+                    liveReportingServices.endDetailsReportingToTheVue2(fic1.getCodeUnique(), fic1.getCodeFichier().get(i1).getCode(), 1L, 1L, 1L);
+                } catch (Exception ex) {
+                    System.out.println(ex.getMessage());
+                }
+            }
+        }
+
+        private void duplicatePostFile(GenererFichierForm fic1, int i1, int CONST1, int defineFileToSave1, String fileName1, Map<String, String> typefile, Map<String, String> dropdown1, Long count1) throws NumberFormatException {
+            BufferedWriter writer = null;
+            String lineFile = "";
+            String codeFichier;
+            Long statut;
+            System.out.println("File " + fic1.getCodeFichier().get(i1).getCode() + " entering duplicateNoPost");
+            List<ReportRep> report = reportRepRepository.preparedResult12(fic1.getCodeFichier().get(i1).getCode(), fic1.getDate());
+            if (report.size() > 0) {
+                liveReportingServicef.beginDetailsReportingToTheVue2(idOpe, fic1.getCodeFichier().get(i1).getCode(), new Long(report.size()));
+                int Friqunce = (int) Math.ceil(report.size() / 100.0);
+                CONST1 = 0;
+                try {
+                    for (int j = 0; j < report.size(); j++) {
+                        if (defineFileToSave1 == 0) {
+                            Path e = null;//
+                            try {
+                                e = Files.createFile(Paths.get(parameters.get("chemin") + fileName1));
+                            } catch (FileAlreadyExistsException ey) {
+                                e = Paths.get(parameters.get("chemin") + fileName1);
+                            }
+                            writer = Files.newBufferedWriter(e, StandardCharsets.UTF_8);
+                            defineFileToSave1 = 1;
+                            String ActualDate = "";
+                            ActualDate = getDateAtTheGoodformat1(fic1.getDate());
+                            lineFile = parameters.get("idetab") + parameters.get("delimiteur")
+                                    + parameters.get("codePays") + parameters.get("delimiteur")
+                                    + parameters.get("status") + parameters.get("delimiteur") + ActualDate
+                                    + parameters.get("delimiteur") + report.get(j).getFichier();
+                            writer.write(lineFile);
+                            writer.newLine();
+                            lineFile = "";
+                        }
+                        codeFichier = fic1.getCodeFichier().get(i1).getCode();
+                        if (CONST1 == 0 && (typefile.get("result").equals("calculate") || typefile.get("result").equals("duplicateNoPost"))) {
+                            lineFile += report.get(j).getPost() + ";";
+                        }
+                        if (CONST1 < Integer.parseInt(dropdown1.get(report.get(j).getFichier())) - (InputWriteRepository.existsByFichi(report.get(j).getFichier()) ? 2 : 1)) {
+                            if (report.get(j).getValc() != null) {
+                                if (report.get(j).getValc()
+                                        .equalsIgnoreCase("***")) {
+
+                                    lineFile += ";";
+
+                                } else {
+                                    lineFile += report.get(j).getValc() + ";";
+
+                                }
+                            } else if (report.get(j).getValm() != null) {
+
+                                if (String.valueOf(report.get(j).getValm())
+                                        .equalsIgnoreCase("***")) {
+
+                                    lineFile += ";";
+
+                                } else {
+                                    lineFile += Math.abs((int) Math.round(report.get(j).getValm())) + ";";
+
+                                }
+
+                            } else if (report.get(j).getVald() != null) {
+
+                                if (String.valueOf(report.get(j).getVald())
+                                        .equalsIgnoreCase("***")) {
+
+                                    lineFile += ";";
+
+                                } else {
+                                    lineFile += report.get(j).getVald() + ";";
+
+                                }
+
+                            } else if (report.get(j).getValt() != null) {
+                                if (String.valueOf(report.get(j).getValt())
+                                        .equalsIgnoreCase("***")) {
+
+                                    lineFile += ";";
+
+                                } else {
+                                    lineFile += report.get(j).getValt() + ";";
+
+                                }
+
+                            } else {
+
+                                lineFile += ";";
+
+                            }
+                            CONST1++;
+                        } else {
+                            //last like which does not have comer
+                            System.out.println("verify last : " + report.get(j).getCol());
+                            if (report.get(j).getValc() != null) {
+
+                                if (report.get(j).getValc()
+                                        .equalsIgnoreCase("***")) {
+
+                                    lineFile += "";
+
+                                } else {
+                                    lineFile += report.get(j).getValc();
+
+                                }
+
+                            } else if (report.get(j).getValm() != null) {
+
+                                if (String.valueOf(report.get(j).getValm())
+                                        .equalsIgnoreCase("***")) {
+
+                                    lineFile += "";
+
+                                } else {
+//	                            	lineFile+=reportDatasGenerated2.get(j).getValm();
+                                    lineFile += Math.abs((int) Math.round(report.get(j).getValm()));
+
+                                }
+
+                            } else if (report.get(j).getVald() != null) {
+
+                                if (String.valueOf(report.get(j).getVald())
+                                        .equalsIgnoreCase("***")) {
+
+                                    lineFile += "";
+
+                                } else {
+                                    lineFile += report.get(j).getVald();
+
+                                }
+
+                            } else if (report.get(j).getValt() != null) {
+
+                                if (String.valueOf(report.get(j).getValt())
+                                        .equalsIgnoreCase("***")) {
+
+                                    lineFile += "";
+
+                                } else {
+                                    lineFile += report.get(j).getValt();
+
+                                }
+
+                            } else {
+
+                                System.out.println("TYPE ERROR .........");
+
+                            }
+                            try {
+                                writer.write(lineFile);
+                            } catch (IOException ex) {
+                                Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null,
+                                        ex);
+                            }
+                            try {
+                                writer.newLine();
+                            } catch (IOException ex) {
+                                Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null,
+                                        ex);
+                            }
+                            count1++;
+//                                Double s = Math.ceil(report.size() / 100.0);
+//                                liveReportingServices.detailsReportingToTheVue2(fic.getCodeUnique(), fic.getCodeFichier().get(i).getCode(), s.longValue());
+                            if (j % Friqunce == 0) {
+                                liveReportingServices.detailsReportingToTheVue3(fic1.getCodeUnique(), fic1.getCodeFichier().get(i1).getCode(), new Long(Friqunce));
+                            }
+                            CONST1 = 0;
+                            lineFile = "";
+                        }
+                    }
+                    defineFileToSave1 = 0;
+                    writer.close();
+                    defineFileToSave1 = 0;
+                    statut = Long.valueOf(1);
+                    liveReportingServices.endDetailsReportingToTheVue2(fic1.getCodeUnique(), fic1.getCodeFichier().get(i1).getCode(), 1L, new Long(report.size()), new Long(report.size()));
+                } catch (IOException ex) {
+                    Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
+                } catch (ParseException ex) {
+                    Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            } else {
+                liveReportingServicef.beginDetailsReportingToTheVue2(idOpe, fic1.getCodeFichier().get(i1).getCode(), 1L);
+                Path e = null;//
+                try {
+                    try {
+                        e = Files.createFile(Paths.get(parameters.get("chemin") + fileName1));
+                    } catch (FileAlreadyExistsException ey) {
+                        e = Paths.get(parameters.get("chemin") + fileName1);
+                    }
+                    writer = Files.newBufferedWriter(e, StandardCharsets.ISO_8859_1);
+                    defineFileToSave1 = 0;
+                    String ActualDate = "";
+                    ActualDate = getDateAtTheGoodformat1(fic1.getDate());
+                    lineFile = parameters.get("idetab") + parameters.get("delimiteur")
+                            + parameters.get("codePays") + parameters.get("delimiteur")
+                            + parameters.get("status") + parameters.get("delimiteur") + ActualDate
+                            + parameters.get("delimiteur") + fic1.getCodeFichier().get(i1).getCode();
+                    System.out.println("the file name is :");
+                    writer.write(lineFile);
+                    writer.close();
+                    System.out.println("no data Collected for :" + fic1.getCodeFichier().get(i1).getCode());
+                    liveReportingServices.endDetailsReportingToTheVue2(fic1.getCodeUnique(), fic1.getCodeFichier().get(i1).getCode(), 1L, 1L, 1L);
+                } catch (Exception ex) {
+                    System.out.println("it was not property closed : " + ex.getLocalizedMessage());
+                }
+            }
+        }
+
+        private void calculation(GenererFichierForm fic1, int i1, int CONST1, int defineFileToSave1, String fileName1, Map<String, String> typefile, Map<String, String> dropdown1, Long count1) throws NumberFormatException {
+            BufferedWriter writer = null;
+            String lineFile = "";
+            String codeFichier;
+            Long statut;
+            System.out.println("File " + fic1.getCodeFichier().get(i1).getCode() + " entering Calculation Type generation");
+            List<ReportRep> report = reportRepRepository.preparedResult12(fic1.getCodeFichier().get(i1).getCode(), fic1.getDate());
+            int Friqunce = (int) Math.ceil(report.size() / 100.0);
+            if (report.size() > 0) {
+                liveReportingServicef.beginDetailsReportingToTheVue2(idOpe, fic1.getCodeFichier().get(i1).getCode(), new Long(report.size()));
+                CONST1 = 0;
+                try {
+                    for (int j = 0; j < report.size(); j++) {
+                        if (defineFileToSave1 == 0) {
+                            Path e = null;//
+                            try {
+                                e = Files.createFile(Paths.get(parameters.get("chemin") + fileName1));
+                            } catch (FileAlreadyExistsException ey) {
+                                e = Paths.get(parameters.get("chemin") + fileName1);
+                            }
+                            writer = Files.newBufferedWriter(e, StandardCharsets.UTF_8);
+                            defineFileToSave1 = 1;
+                            String ActualDate = "";
+                            ActualDate = getDateAtTheGoodformat1(fic1.getDate());
+                            lineFile = parameters.get("idetab") + parameters.get("delimiteur")
+                                    + parameters.get("codePays") + parameters.get("delimiteur")
+                                    + parameters.get("status") + parameters.get("delimiteur") + ActualDate
+                                    + parameters.get("delimiteur") + report.get(j).getFichier();
+                            writer.write(lineFile);
+                            writer.newLine();
+                            lineFile = "";
+                        }
+                        codeFichier = fic1.getCodeFichier().get(i1).getCode();
+                        if (CONST1 == 0 && (typefile.get("result").equals("calculate") || typefile.get("result").equals("duplicateNoPost"))) {
+                            lineFile += report.get(j).getPost() + ";";
+                        }
+                        if (CONST1 < Integer.parseInt(dropdown1.get(report.get(j).getFichier())) - 2) {
+                            if (report.get(j).getValc() != null) {
+                                if (report.get(j).getValc()
+                                        .equalsIgnoreCase("***")) {
+
+                                    lineFile += ";";
+
+                                } else {
+                                    lineFile += report.get(j).getValc() + ";";
+
+                                }
+                            } else if (report.get(j).getValm() != null) {
+
+                                if (String.valueOf(report.get(j).getValm())
+                                        .equalsIgnoreCase("***")) {
+
+                                    lineFile += ";";
+
+                                } else {
+                                    lineFile += Math.abs((int) Math.round(report.get(j).getValm())) + ";";
+
+                                }
+
+                            } else if (report.get(j).getVald() != null) {
+
+                                if (String.valueOf(report.get(j).getVald())
+                                        .equalsIgnoreCase("***")) {
+
+                                    lineFile += ";";
+
+                                } else {
+                                    lineFile += report.get(j).getVald() + ";";
+
+                                }
+
+                            } else if (report.get(j).getValt() != null) {
+                                if (String.valueOf(report.get(j).getValt())
+                                        .equalsIgnoreCase("***")) {
+
+                                    lineFile += ";";
+
+                                } else {
+                                    lineFile += report.get(j).getValt() + ";";
+
+                                }
+
+                            } else {
+
+                                lineFile += ";";
+
+                            }
+                            CONST1++;
+                        } else {
+                            //last like which does not have comer
+
+                            if (report.get(j).getValc() != null) {
+
+                                if (report.get(j).getValc()
+                                        .equalsIgnoreCase("***")) {
+
+                                    lineFile += "";
+
+                                } else {
+                                    lineFile += report.get(j).getValc();
+
+                                }
+
+                            } else if (report.get(j).getValm() != null) {
+
+                                if (String.valueOf(report.get(j).getValm())
+                                        .equalsIgnoreCase("***")) {
+
+                                    lineFile += "";
+
+                                } else {
+                                    lineFile += Math.abs((int) Math.round(report.get(j).getValm()));
+
+                                }
+
+                            } else if (report.get(j).getVald() != null) {
+
+                                if (String.valueOf(report.get(j).getVald())
+                                        .equalsIgnoreCase("***")) {
+
+                                    lineFile += "";
+
+                                } else {
+                                    lineFile += report.get(j).getVald();
+
+                                }
+
+                            } else if (report.get(j).getValt() != null) {
+
+                                if (String.valueOf(report.get(j).getValt())
+                                        .equalsIgnoreCase("***")) {
+
+                                    lineFile += "";
+
+                                } else {
+                                    lineFile += report.get(j).getValt();
+
+                                }
+
+                            } else {
+
+                                System.out.println("TYPE ERROR .........");
+
+                            }
+                            try {
+                                writer.write(lineFile);
+                            } catch (IOException ex) {
+                                Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null,
+                                        ex);
+                            }
+                            try {
+                                writer.newLine();
+                            } catch (IOException ex) {
+                                Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null,
+                                        ex);
+                            }
+                            count1++;
+//                                Double s = Math.ceil(report.size() / 100.0);
+//                                liveReportingServices.detailsReportingToTheVue2(fic.getCodeUnique(), fic.getCodeFichier().get(i).getCode(), s.longValue());
+                            if (j % Friqunce == 0) {
+                                liveReportingServices.detailsReportingToTheVue3(fic1.getCodeUnique(), fic1.getCodeFichier().get(i1).getCode(), new Long(Friqunce));
+                            }
+                            CONST1 = 0;
+                            lineFile = "";
+                        }
+                    }
+                    defineFileToSave1 = 0;
+                    writer.close();
+                    defineFileToSave1 = 0;
+                    statut = Long.valueOf(1);
+                    liveReportingServices.endDetailsReportingToTheVue2(fic1.getCodeUnique(), fic1.getCodeFichier().get(i1).getCode(), 1L, new Long(report.size()), new Long(report.size()));
+                    nombreOpeTraite++;
+                    quotien = Long.valueOf(1);
+                    count1 = Long.valueOf(0);
+                } catch (IOException ex) {
+                    Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
+                } catch (ParseException ex) {
+                    Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            } else {
+                System.out.println("no data Collected for :" + fic1.getCodeFichier().get(i1).getCode());
+                liveReportingServicef.beginDetailsReportingToTheVue2(idOpe, fic1.getCodeFichier().get(i1).getCode(), 1L);
+                Path e = null;//
+                try {
+                    try {
+                        e = Files.createFile(Paths.get(parameters.get("chemin") + fileName1));
+                    } catch (FileAlreadyExistsException ey) {
+                        e = Paths.get(parameters.get("chemin") + fileName1);
+                    }
+                    writer = Files.newBufferedWriter(e, StandardCharsets.ISO_8859_1);
+                    defineFileToSave1 = 0;
+                    String ActualDate = "";
+                    ActualDate = getDateAtTheGoodformat1(fic1.getDate());
+                    lineFile = parameters.get("idetab") + parameters.get("delimiteur")
+                            + parameters.get("codePays") + parameters.get("delimiteur")
+                            + parameters.get("status") + parameters.get("delimiteur") + ActualDate
+                            + parameters.get("delimiteur") + fic1.getCodeFichier().get(i1).getCode();
+                    writer.write(lineFile);
+                    writer.close();
+                    liveReportingServices.endDetailsReportingToTheVue2(fic1.getCodeUnique(), fic1.getCodeFichier().get(i1).getCode(), 1L, 1L, 1L);
+                } catch (Exception ex) {
+                    System.out.println(ex.getMessage());
+                }
+            }
+        }
+
+        private void calculationSesame(GenererFichierForm fic1, int i1, int CONST1, int defineFileToSave1, String fileName1, Map<String, String> typefile, Map<String, String> dropdown1, Long count1) throws NumberFormatException {
+            BufferedWriter writer = null;
+            List<ReportFile> report = reportFileRepository.preparedResultSesame(fic1.getCodeFichier().get(i1).getCode(), fic1.getDate());
+            int Friqunce = (int) Math.ceil(report.size() / 100.0);
+            if (report.size() > 0) {
+                liveReportingServicef.beginDetailsReportingToTheVue2(idOpe, fic1.getCodeFichier().get(i1).getCode(), new Long(report.size()));
+                for (ReportFile y : report) {
+                    System.out.println("writing :"+y.getPoste()+" : "+y.getCol() +" : value= "+y.getGen());
+                }
+            }
+        }
+
     }
-   
+
 //
 //    public String genererFichiersPv1(GenererFichierForm fic) {
 //
@@ -2012,7 +2052,6 @@ public class GenererFichierServiceImpl implements GenererFichierServices {
 //        return "1";
 //
 //    }
-
     public static String randoms() {
 
         Date date = new Date();
