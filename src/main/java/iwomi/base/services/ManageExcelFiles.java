@@ -9,6 +9,8 @@ import iwomi.base.objects.ReportRep;
 import iwomi.base.objects.SqlFileType;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -24,6 +26,7 @@ import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +43,7 @@ import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.apache.poi.xssf.streaming.SXSSFSheet;
 import org.apache.poi.xssf.streaming.SXSSFWorkbook;
 import org.apache.poi.xssf.usermodel.XSSFFont;
@@ -80,7 +84,7 @@ public class ManageExcelFiles extends GlobalService {
         return true;
     }
 
-    public Path sesamGeneration(String filename, Statement ert) throws Exception {
+    public String sesamGeneration(String filename, Statement ert) throws Exception {
         try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream();) {
             Sheet sheet = workbook.createSheet(SHEET);
             ResultSet er = ert.executeQuery("select lib2 from sanm where tabcd = '0012' and acscd = '0038' and dele = 0");
@@ -105,13 +109,61 @@ public class ManageExcelFiles extends GlobalService {
                 perms.add(PosixFilePermission.OTHERS_EXECUTE);
                 Files.setPosixFilePermissions(path, perms);
             }
-           return (new File(fr1r)).toPath();
+           return fr1r;
         } catch (IOException e) {
 
         }
         return null;
     }
 
+    public Map<String, Object> update_excel_file(Map<String, String> request) {
+         System.out.println("yvo start execution ");
+          Map<String, Object> result = new HashMap<>();
+         
+          ArrayList al = new ArrayList();
+        // from where file is to be read
+        //File file1 = new File("C:/savedexcel/FM1000.xlsx");
+        File file1 = new File("C:/savedexcel/bilan.xlsx");
+       // List<ReportRep> report = reportRepRepository.preparedResult12(request.get("file"), request.get("dar"));       
+        List<ReportRep> report=new ArrayList();
+        //CONST = 0;
+     //for (int j = 0; j < report.size(); j++) {
+       //System.out.println("yvo start execution "+report.get(j).getPost());
+         try {
+             //ajout d'element dans le fichier
+              FileInputStream fileI= new FileInputStream( file1);
+             Workbook workbookF = WorkbookFactory.create(fileI);
+             Sheet sheet = workbookF.getSheetAt(1);
+             int rowCount = sheet.getLastRowNum()+5;
+             System.out.println("yvo start execution rang2 ");
+            for (int r = 0; r <= rowCount; r++) {
+                System.out.println("yvo start execution cel01 ");
+                  Row row = sheet.getRow(r);
+                 System.out.println("yvo start execution cell0 ");
+                 row.createCell(3).setCellValue(request.get("code"));
+                row.createCell(4).setCellValue(request.get("name"));
+                 System.out.println("yvo start execution cell2 ");
+                row.createCell(5).setCellValue(request.get("age"));
+                 row.createCell(6).setCellValue(request.get("bonjour yves"));
+                  System.out.println("yvo start execution cell3 ");
+             }
+           
+                fileI.close();
+                
+                FileOutputStream fileO = new FileOutputStream( file1);
+                workbookF.write(fileO);
+                fileO.close();
+                System.out.println("Data Copied to Excel");      
+         } catch (IOException ex) {
+             Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
+         }
+    // }
+          result.put("success", "01");
+          result.put("data", al);
+        return result;
+
+    }
+    
     public List<ReportRep> excelToReport(InputStream is, String file, Date dar, int colnum) {
         String t = "";
         try {

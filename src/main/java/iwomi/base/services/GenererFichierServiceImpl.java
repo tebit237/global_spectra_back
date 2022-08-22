@@ -72,6 +72,8 @@ import iwomi.base.repositories.ReportDatasGeneratedRepository;
 import iwomi.base.repositories.ReportFileRepository;
 import iwomi.base.repositories.ReportRepRepository;
 import java.io.BufferedReader;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.nio.charset.StandardCharsets;
@@ -83,7 +85,12 @@ import java.util.Calendar;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import org.apache.poi.EncryptedDocumentException;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -852,14 +859,15 @@ public class GenererFichierServiceImpl implements GenererFichierServices {
                 }
             } else {
                 ManageExcelFiles se = new ManageExcelFiles();
+                String file = "";
                 try {
-                    Path file = se.sesamGeneration(fic.getCodeFichier().get(i).getCode(), r);
+                    file = se.sesamGeneration(fic.getCodeFichier().get(i).getCode(), r);
 
                 } catch (Exception ex) {
                     Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
                 }
                 if (typefile.get("result").equals("calculate")) {
-                    calculationSesame(fic, i, CONST, defineFileToSave, fileName, typefile, dropdown, count);
+                    calculationSesame(fic, i, CONST, defineFileToSave, fileName, typefile, dropdown, count, file);
                 } else if (typefile.get("result").equals("duplicateNoPost")) {
                     duplicatePostFile(fic, i, CONST, defineFileToSave, fileName, typefile, dropdown, count);
                 } else if (typefile.get("result").equals("duplicate")) {
@@ -1614,15 +1622,36 @@ public class GenererFichierServiceImpl implements GenererFichierServices {
             }
         }
 
-        private void calculationSesame(GenererFichierForm fic1, int i1, int CONST1, int defineFileToSave1, String fileName1, Map<String, String> typefile, Map<String, String> dropdown1, Long count1) throws NumberFormatException {
+        private void calculationSesame(GenererFichierForm fic1, int i1, int CONST1, int defineFileToSave1, String fileName1, Map<String, String> typefile, Map<String, String> dropdown1, Long count1, String file1) throws NumberFormatException {
             BufferedWriter writer = null;
             List<ReportFile> report = reportFileRepository.preparedResultSesame(fic1.getCodeFichier().get(i1).getCode(), fic1.getDate());
             int Friqunce = (int) Math.ceil(report.size() / 100.0);
             if (report.size() > 0) {
                 liveReportingServicef.beginDetailsReportingToTheVue2(idOpe, fic1.getCodeFichier().get(i1).getCode(), new Long(report.size()));
-                for (ReportFile o : report) {
-                    //x = t, y = 
-                    System.out.println("writing :"+o.getX()+" : "+o.getY() +" : value= "+o.getGen());
+                FileInputStream fileI;
+                System.out.println(file1);
+                try {
+                    fileI = new FileInputStream(file1);
+                    Workbook workbookF = WorkbookFactory.create(fileI);
+                    Sheet sheet = workbookF.getSheetAt(0);
+                    for (ReportFile o : report) {
+                        //x = t, y = 
+                        System.out.println("writing :" + o.getX().intValue() + " : " + o.getY().intValue() + " : value= " + o.getGen());
+                        Cell cell = sheet
+                                .getRow(o.getY().intValue()-1)
+                                .getCell(o.getX().intValue()-1);
+                        cell.setCellValue(o.getGen());
+                    }
+                    FileOutputStream fileO = new FileOutputStream(file1);
+                    workbookF.write(fileO);
+                    fileO.close();
+                    
+                } catch (FileNotFoundException ex) {
+                    Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
+                } catch (IOException ex) {
+                    Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
+                } catch (EncryptedDocumentException ex) {
+                    Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
                 }
             }
         }
