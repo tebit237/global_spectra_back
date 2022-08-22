@@ -10,7 +10,7 @@
     <!--<packaging>war</packaging>-->
     <packaging>jar</packaging>
 
-    <name>spectra</name>
+    <name>spectraCCC</name>
     <description>Reporting And Spectra Application</description>
     <parent>
         <groupId>org.springframework.boot</groupId>

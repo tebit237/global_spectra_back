@@ -51,9 +51,11 @@ import iwomi.base.repositories.InrapatRepository;
 import iwomi.base.repositories.IntitreRepository;
 import iwomi.base.repositories.IntransRepository;
 import iwomi.base.services.ChargerDonneesServiceImpl;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.PostConstruct;
@@ -63,6 +65,7 @@ import org.springframework.core.task.TaskExecutor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMethod;
 
 /**
  *
@@ -111,6 +114,7 @@ public class GenererFichierControllers {
     private IntitreRepository intitreRepository;
     @Autowired
     private IntransRepository intransRepository;
+
 
     @PostMapping(path = "/generateFiles")
     public String genererFichier(@RequestBody GenererFichierForm fic) {
@@ -263,6 +267,12 @@ public class GenererFichierControllers {
     @GetMapping("/getTRANS/{dar}")
     public List<Intran> intran(@PathVariable String dar) {
         return (List<Intran>) intransRepository.findIntranByDar(dar);
+    }
+    @RequestMapping(value = "/update_file", method = RequestMethod.POST)
+    public Map<String, Object> update_file(@RequestBody Map<String, String> payload) throws Exception {
+        System.out.println("yvo update_file Test3 ");
+        //System.out.println(payload);
+        return genererFichierServices.update_excel_file(payload);
     }
 
 }
