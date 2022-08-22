@@ -1620,8 +1620,9 @@ public class GenererFichierServiceImpl implements GenererFichierServices {
             int Friqunce = (int) Math.ceil(report.size() / 100.0);
             if (report.size() > 0) {
                 liveReportingServicef.beginDetailsReportingToTheVue2(idOpe, fic1.getCodeFichier().get(i1).getCode(), new Long(report.size()));
-                for (ReportFile y : report) {
-                    System.out.println("writing :"+y.getPoste()+" : "+y.getCol() +" : value= "+y.getGen());
+                for (ReportFile o : report) {
+                    //x = t, y = 
+                    System.out.println("writing :"+o.getX()+" : "+o.getY() +" : value= "+o.getGen());
                 }
             }
         }

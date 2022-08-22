@@ -38,7 +38,7 @@ public class ReportFile implements Serializable {
     private Long t;
     private Long y;
 
-    public void setT(Long t) {
+    public void setX(Long t) {
         this.t = t;
     }
 
@@ -46,7 +46,7 @@ public class ReportFile implements Serializable {
         this.y = x;
     }
 
-    public Long getT() {
+    public Long getX() {
         return t;
     }
 
