@@ -861,7 +861,7 @@ public class GenererFichierServiceImpl implements GenererFichierServices {
                 ManageExcelFiles se = new ManageExcelFiles();
                 String file = "";
                 try {
-                    file = se.sesamGeneration(fic.getCodeFichier().get(i).getCode(), r);
+                    file = se.sesamGeneration(fic.getCodeFichier().get(i).getCode(), r,fic.getDate());
 
                 } catch (Exception ex) {
                     Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
@@ -1630,14 +1630,13 @@ public class GenererFichierServiceImpl implements GenererFichierServices {
             if (report.size() > 0) {
                 liveReportingServicef.beginDetailsReportingToTheVue2(idOpe, fic1.getCodeFichier().get(i1).getCode(), new Long(report.size()));
                 FileInputStream fileI;
-                System.out.println(file1);
+                System.out.println("file heer :"+file1);
                 try {
                     fileI = new FileInputStream(file1);
                     Workbook workbookF = WorkbookFactory.create(fileI);
                     Sheet sheet = workbookF.getSheetAt(0);
                     for (ReportFile o : report) {
                         //x = t, y = 
-                        System.out.println("writing :" + o.getX().intValue() + " : " + o.getY().intValue() + " : value= " + o.getGen());
                         Cell cell = sheet
                                 .getRow(o.getY().intValue()-1)
                                 .getCell(o.getX().intValue()-1);

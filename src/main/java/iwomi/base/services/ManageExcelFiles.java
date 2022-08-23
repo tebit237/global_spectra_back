@@ -84,7 +84,7 @@ public class ManageExcelFiles extends GlobalService {
         return true;
     }
 
-    public String sesamGeneration(String filename, Statement ert) throws Exception {
+    public String sesamGeneration(String filename, Statement ert, String dat) throws Exception {
         try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream();) {
             Sheet sheet = workbook.createSheet(SHEET);
             ResultSet er = ert.executeQuery("select lib2 from sanm where tabcd = '0012' and acscd = '0038' and dele = 0");
@@ -92,12 +92,22 @@ public class ManageExcelFiles extends GlobalService {
             String fr1 = er.getString("lib2") + "/" + filename + ".xlsx";
             ResultSet err = ert.executeQuery("select lib2 from sanm where tabcd = '0012' and acscd = '0015' and dele = 0");
             err.next();
-            String fr1r = err.getString("lib2") + "/" + filename + ".xlsx";
+            String fr1r = err.getString("lib2") + "/" + dat + "/" + filename + ".xlsx";
+            try {
+                Files.createDirectory((new File(err.getString("lib2") + "/" + dat)).toPath());
+            } catch (Exception re) {
+                System.out.println("the v : " + re.getLocalizedMessage());
+            }
             try {
                 Files.copy((new File(fr1)).toPath(), (new File(fr1r)).toPath());
             } catch (IOException g) {
-                Files.delete((new File(fr1r)).toPath());
-                Files.copy((new File(fr1)).toPath(), (new File(fr1r)).toPath());
+                try {
+                    Files.delete((new File(fr1r)).toPath());
+                    Files.copy((new File(fr1)).toPath(), (new File(fr1r)).toPath());
+                } catch (Exception r) {
+                    System.out.println("error is :" + r.getLocalizedMessage());
+                }
+
             }
             ResultSet erru = ert.executeQuery("select lib2 from sanm where tabcd = '0012' and acscd = '0041' and dele = 0");
             erru.next();
@@ -109,61 +119,61 @@ public class ManageExcelFiles extends GlobalService {
                 perms.add(PosixFilePermission.OTHERS_EXECUTE);
                 Files.setPosixFilePermissions(path, perms);
             }
-           return fr1r;
-        } catch (IOException e) {
-
+            return fr1r;
+        } catch (Exception e) {
+            System.out.println("error is r:" + e.getLocalizedMessage());
         }
         return null;
     }
 
     public Map<String, Object> update_excel_file(Map<String, String> request) {
-         System.out.println("yvo start execution ");
-          Map<String, Object> result = new HashMap<>();
-         
-          ArrayList al = new ArrayList();
+        System.out.println("yvo start execution ");
+        Map<String, Object> result = new HashMap<>();
+
+        ArrayList al = new ArrayList();
         // from where file is to be read
         //File file1 = new File("C:/savedexcel/FM1000.xlsx");
         File file1 = new File("C:/savedexcel/bilan.xlsx");
-       // List<ReportRep> report = reportRepRepository.preparedResult12(request.get("file"), request.get("dar"));       
-        List<ReportRep> report=new ArrayList();
+        // List<ReportRep> report = reportRepRepository.preparedResult12(request.get("file"), request.get("dar"));       
+        List<ReportRep> report = new ArrayList();
         //CONST = 0;
-     //for (int j = 0; j < report.size(); j++) {
-       //System.out.println("yvo start execution "+report.get(j).getPost());
-         try {
-             //ajout d'element dans le fichier
-              FileInputStream fileI= new FileInputStream( file1);
-             Workbook workbookF = WorkbookFactory.create(fileI);
-             Sheet sheet = workbookF.getSheetAt(1);
-             int rowCount = sheet.getLastRowNum()+5;
-             System.out.println("yvo start execution rang2 ");
+        //for (int j = 0; j < report.size(); j++) {
+        //System.out.println("yvo start execution "+report.get(j).getPost());
+        try {
+            //ajout d'element dans le fichier
+            FileInputStream fileI = new FileInputStream(file1);
+            Workbook workbookF = WorkbookFactory.create(fileI);
+            Sheet sheet = workbookF.getSheetAt(1);
+            int rowCount = sheet.getLastRowNum() + 5;
+            System.out.println("yvo start execution rang2 ");
             for (int r = 0; r <= rowCount; r++) {
                 System.out.println("yvo start execution cel01 ");
-                  Row row = sheet.getRow(r);
-                 System.out.println("yvo start execution cell0 ");
-                 row.createCell(3).setCellValue(request.get("code"));
+                Row row = sheet.getRow(r);
+                System.out.println("yvo start execution cell0 ");
+                row.createCell(3).setCellValue(request.get("code"));
                 row.createCell(4).setCellValue(request.get("name"));
-                 System.out.println("yvo start execution cell2 ");
+                System.out.println("yvo start execution cell2 ");
                 row.createCell(5).setCellValue(request.get("age"));
-                 row.createCell(6).setCellValue(request.get("bonjour yves"));
-                  System.out.println("yvo start execution cell3 ");
-             }
-           
-                fileI.close();
-                
-                FileOutputStream fileO = new FileOutputStream( file1);
-                workbookF.write(fileO);
-                fileO.close();
-                System.out.println("Data Copied to Excel");      
-         } catch (IOException ex) {
-             Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
-         }
-    // }
-          result.put("success", "01");
-          result.put("data", al);
+                row.createCell(6).setCellValue(request.get("bonjour yves"));
+                System.out.println("yvo start execution cell3 ");
+            }
+
+            fileI.close();
+
+            FileOutputStream fileO = new FileOutputStream(file1);
+            workbookF.write(fileO);
+            fileO.close();
+            System.out.println("Data Copied to Excel");
+        } catch (IOException ex) {
+            Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        // }
+        result.put("success", "01");
+        result.put("data", al);
         return result;
 
     }
-    
+
     public List<ReportRep> excelToReport(InputStream is, String file, Date dar, int colnum) {
         String t = "";
         try {
