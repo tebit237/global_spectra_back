@@ -839,14 +839,14 @@ public class GenererFichierServiceImpl implements GenererFichierServices {
                 // TODO Auto-generated catch block
                 e.printStackTrace();
             }
-            if (parameters.get("typeReporting").equalsIgnoreCase("2")) {
-                try {
-                    fileName = getYearMonth2(fic.getDate()) + fic.getCodeFichier().get(i).getCode()
-                            + parameters.get("idetab") + "." + parameters.get("extention");
-                    System.out.println("FILE NAME " + fileName);
-                } catch (ParseException ex) {
-                    System.out.println("Date (yyyy-MM-dd) Could not be formated " + fic.getDate());
-                }
+            try {
+                fileName = getYearMonth2(fic.getDate()) + fic.getCodeFichier().get(i).getCode()
+                        + parameters.get("idetab") + "." + parameters.get("extention");
+                System.out.println("FILE NAME " + fileName);
+            } catch (ParseException ex) {
+                System.out.println("Date (yyyy-MM-dd) Could not be formated " + fic.getDate());
+            }
+            if (parameters.get("typeReporting").equalsIgnoreCase("1")) {
 
                 if (typefile.get("result").equals("calculate")) {
                     calculation(fic, i, CONST, defineFileToSave, fileName, typefile, dropdown, count);
@@ -857,16 +857,16 @@ public class GenererFichierServiceImpl implements GenererFichierServices {
                 } else if (typefile.get("result").equals("sql")) {
                     fileName = sqlTypeFile(fic, i, defineFileToSave, fileName, typefile, count);
                 }
-            } else {
+            } else if (parameters.get("typeReporting").equalsIgnoreCase("2")) {
                 ManageExcelFiles se = new ManageExcelFiles();
                 String file = "";
                 try {
-                    file = se.sesamGeneration(fic.getCodeFichier().get(i).getCode(), r,fic.getDate());
+                    file = se.sesamGeneration(fic.getCodeFichier().get(i).getCode(), r, fileName);
 
                 } catch (Exception ex) {
                     Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
                 }
-                fileName = fic.getDate()+'/'+fic.getCodeFichier().get(i).getCode()+".xlsx";
+//                fileName = fic.getDate() + '/' + fic.getCodeFichier().get(i).getCode() + ".xlsx";
                 if (typefile.get("result").equals("calculate")) {
                     calculationSesame(fic, i, CONST, defineFileToSave, fileName, typefile, dropdown, count, file);
                 } else if (typefile.get("result").equals("duplicateNoPost")) {
@@ -1630,22 +1630,28 @@ public class GenererFichierServiceImpl implements GenererFichierServices {
             if (report.size() > 0) {
                 liveReportingServicef.beginDetailsReportingToTheVue2(idOpe, fic1.getCodeFichier().get(i1).getCode(), new Long(report.size()));
                 FileInputStream fileI;
-                System.out.println("file heer :"+file1);
+                System.out.println("file heer :" + file1);
                 try {
                     fileI = new FileInputStream(file1);
                     Workbook workbookF = WorkbookFactory.create(fileI);
                     Sheet sheet = workbookF.getSheetAt(0);
+                    int j = 0;
                     for (ReportFile o : report) {
                         //x = t, y = 
                         Cell cell = sheet
-                                .getRow(o.getY().intValue()-1)
-                                .getCell(o.getX().intValue()-1);
+                                .getRow(o.getY().intValue() - 1)
+                                .getCell(o.getX().intValue() - 1);
                         cell.setCellValue(o.getGen());
+                        if (j++ % Friqunce == 0) {
+                            liveReportingServices.detailsReportingToTheVue3(fic1.getCodeUnique(), fic1.getCodeFichier().get(i1).getCode(), new Long(Friqunce));
+                        }
                     }
+                    liveReportingServices.endDetailsReportingToTheVue2(fic1.getCodeUnique(), fic1.getCodeFichier().get(i1).getCode(), 1L, new Long(report.size()), new Long(report.size()));
+
                     FileOutputStream fileO = new FileOutputStream(file1);
                     workbookF.write(fileO);
                     fileO.close();
-                    
+
                 } catch (FileNotFoundException ex) {
                     Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
                 } catch (IOException ex) {

@@ -84,7 +84,7 @@ public class ManageExcelFiles extends GlobalService {
         return true;
     }
 
-    public String sesamGeneration(String filename, Statement ert, String dat) throws Exception {
+    public String sesamGeneration(String filename, Statement ert, String fname) throws Exception {
         try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream();) {
             Sheet sheet = workbook.createSheet(SHEET);
             ResultSet er = ert.executeQuery("select lib2 from sanm where tabcd = '0012' and acscd = '0038' and dele = 0");
@@ -92,12 +92,12 @@ public class ManageExcelFiles extends GlobalService {
             String fr1 = er.getString("lib2") + "/" + filename + ".xlsx";
             ResultSet err = ert.executeQuery("select lib2 from sanm where tabcd = '0012' and acscd = '0015' and dele = 0");
             err.next();
-            String fr1r = err.getString("lib2") + "/" + dat + "/" + filename + ".xlsx";
-            try {
-                Files.createDirectory((new File(err.getString("lib2") + "/" + dat)).toPath());
-            } catch (Exception re) {
-                System.out.println("the v : " + re.getLocalizedMessage());
-            }
+            String fr1r = err.getString("lib2") + "/" + fname;
+//            try {
+//                Files.createDirectory((new File(err.getString("lib2") + "/" + dat)).toPath());
+//            } catch (Exception re) {
+//                System.out.println("the v : " + re.getLocalizedMessage());
+//            }
             try {
                 Files.copy((new File(fr1)).toPath(), (new File(fr1r)).toPath());
             } catch (IOException g) {
