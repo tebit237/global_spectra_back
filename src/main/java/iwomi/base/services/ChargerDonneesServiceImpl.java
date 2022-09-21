@@ -801,7 +801,9 @@ public class ChargerDonneesServiceImpl implements ChargerDonneesService {
                                 byte[] decoder = Base64.getDecoder().decode(rsp.getString("pass"));
                                 String v = new String(decoder);
                                 Class.forName(rsp.getString("lib2"));
-                                rs1 = DriverManager.getConnection(rsp.getString("lib1"), rsp.getString("login"), v).createStatement().executeQuery("select count(*) o from (" + query + ")");
+                                rs1 = DriverManager.getConnection(rsp.getString("lib1"), rsp.getString("login"), v)
+                                        .createStatement()
+                                        .executeQuery("select count(*) o from (" + query + ")");
                                 rs = DriverManager.getConnection(rsp.getString("lib1"), rsp.getString("login"), v).createStatement().executeQuery(query);
                                 System.out.println(query);
                             }
@@ -1114,6 +1116,9 @@ public class ChargerDonneesServiceImpl implements ChargerDonneesService {
                                                 }
 
                                             }
+                                        }
+                                        if (invgenrList.size() > 0) {
+                                            invgenrRepository.save(invgenrList);
                                         }
                                     } catch (IOException ex) {
                                         Logger.getLogger(ChargerDonneesServiceImpl1.class.getName()).log(Level.SEVERE, null, ex);
@@ -2484,8 +2489,6 @@ public class ChargerDonneesServiceImpl implements ChargerDonneesService {
         return e;
     }
 
-  
-
     public String randoms() {
 
         Date date = new Date();
@@ -2549,7 +2552,7 @@ public class ChargerDonneesServiceImpl implements ChargerDonneesService {
                 String newstring = new SimpleDateFormat("yyyyMMdd").format(date);
                 return newstring;
             } catch (ParseException ex) {
-               System.out.println("date :"+d+" not well formated :"+ex.getMessage());
+                System.out.println("date :" + d + " not well formated :" + ex.getMessage());
             }
         }
         return "";

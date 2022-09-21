@@ -274,6 +274,26 @@ public class ReportCalculateServiceImpl extends GlobalService implements ReportC
         throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
 
+    @Override
+    public String insertPeriodsValiables(String e, Statement r) throws SQLException, ClassNotFoundException, JSONException {
+        ResultSet result = r.executeQuery("SELECT * FROM sanm  WHERE tabcd='3018' AND dele='0' and acscd = '001'");
+        while (result.next()) {
+            e = e.replaceAll("//cm//", "to_date('" + result.getString("lib1") + "','ddMMyyyy')").
+                    replaceAll("//cq//", "to_date('" + result.getString("lib2") + "','ddMMyyyy')").
+                    replaceAll("//cs//", "to_date('" + result.getString("lib3") + "','ddMMyyyy')").
+                    replaceAll("//cy//", "to_date('" + result.getString("lib4") + "','ddMMyyyy')").
+                    replaceAll("//pm//", "to_date('" + result.getString("lib5") + "','ddMMyyyy')").
+                    replaceAll("//pq//", "to_date('" + result.getString("taux1") + "','ddMMyyyy')").
+                    replaceAll("//ps//", "to_date('" + result.getString("taux2") + "','ddMMyyyy')").
+                    replaceAll("//py//", "to_date('" + result.getString("taux3") + "','ddMMyyyy')");
+        }
+        if (result != null) {
+            result = null;
+        }
+        System.gc();
+        return e;
+    }
+
     public class Treatement implements Runnable {
 
         String fichier;
@@ -370,8 +390,7 @@ public class ReportCalculateServiceImpl extends GlobalService implements ReportC
                     formule = insertPeriodsValiables(formule.replaceAll("//dar//", "to_date('" + fich.get("date").toString() + "','yyyy-mm-dd')"), r);
                     System.out.println(formule);
                     if (type.get("link") != null) {// link link
-                        findBySql3(formule, fich.get("date").toString(), efi,
-                                type.get("col_number"), type.get("link").toString(), r, fich.get("codeUnique").toString(), idOpe,fich.get("etab").toString());
+                        findBySql3(formule, fich.get("date").toString(), efi, type.get("col_number"), type.get("link").toString(), r, fich.get("codeUnique").toString(), idOpe, fich.get("etab").toString());
                     } else {// internal database
                         liveReportingService.beginDetailsReportingToTheVue2(idOpe, efi, 2L);
                         findBySql2v1(formule, fich.get("date").toString(), efi, fich.get("codeUnique").toString());
@@ -379,7 +398,7 @@ public class ReportCalculateServiceImpl extends GlobalService implements ReportC
                 }
             } else {
                 System.out.println("Fichier type calculation");
-                if (efi.equalsIgnoreCase("F1000")||efi.equalsIgnoreCase("FM1000")) {
+                if (efi.equalsIgnoreCase("F1000") || efi.equalsIgnoreCase("FM1000")) {
                     List<Map<String, Object>> FICSQLr = findCalcByPoint1(efi);// all *** cells
                     List<Map<String, Object>> FICPOST = findCalcByPost(efi);
                     List<Map<String, Object>> FICSQLe = findCalcByPoint2(efi);// all *** cells
@@ -446,7 +465,7 @@ public class ReportCalculateServiceImpl extends GlobalService implements ReportC
                     minim = new Long(Friqunce);
                     liveReportingService.beginDetailsReportingToTheVue2(idOpe, efi, Total);
                     savePost250202019v1(efi, fich.get("etab").toString(), fich.get("date").toString(),
-                            fich.get("cuser").toString(), fich.get("codeUnique").toString(), FICPOST, minim);
+                            fich.get("cuser").toString(), fich.get("codeUnique").toString(), FICPOST, minim, cloture.get(efi));
                     saveSql250202019V1(efi, fich.get("etab").toString(), fich.get("date").toString(),
                             fich.get("cuser").toString(), fich.get("codeUnique").toString(), FICSQL, minim);
                     savePoint30032020v1(efi, fich.get("etab").toString(), fich.get("date").toString(),
@@ -545,7 +564,9 @@ public class ReportCalculateServiceImpl extends GlobalService implements ReportC
                 }
                 liveReportingService.detailsReportingToTheVue2(idtrait, fichier, minimum);
             }
-            et.add(globalpostqury);
+            if (globalpostqury != "") {
+                et.add(globalpostqury);
+            }
             lotSavingCalcule(et, date, idtrait, fichier, 50L);
         }
     }
@@ -560,15 +581,16 @@ public class ReportCalculateServiceImpl extends GlobalService implements ReportC
         if (FICSQL.size() > 0) {
             for (int t = 0; t < FICSQL.size(); t++) {
                 String formule = FICSQL.get(t).get("CALC").toString();
-                formule = formule.replaceAll(":" + FICSQL.get(t).get("POST").toString(), FICSQL.get(t).get("POST").toString());
                 System.out.println("formule sql :" + formule);
                 formule = formule.replaceAll(":dar", "to_date('" + date.trim() + "','yyyy-mm-dd')");
 //                System.out.println(FICSQL.get(t).get("RANG"));
                 String ret = findBySqlv1(formule);
-                Double dre = Double.parseDouble(ret);
-                Double divd = Double.parseDouble(FICSQL.get(t).get("DIVD").toString());
-                long soldet = Math.round(dre / divd);
-                ret = soldet + "";
+                if (FICSQL.get(t).get("TYPEVAL").toString().equalsIgnoreCase("M")) {
+                    Double dre = Double.parseDouble(ret);
+                    Double divd = Double.parseDouble(FICSQL.get(t).get("DIVD").toString());
+                    long soldet = Math.round(dre / divd);
+                    ret = soldet + "";
+                }
                 saveCalcTmpv1(etab, FICSQL.get(t).get("POST").toString(), FICSQL.get(t).get("COL").toString(),
                         ret, fichier, date,
                         Integer.parseInt(FICSQL.get(t).get("RANG").toString()), t, cuser,
@@ -850,7 +872,7 @@ public class ReportCalculateServiceImpl extends GlobalService implements ReportC
         return (sql);
     }
 
-    private void savePost250202019v1(String fichier, String etab, String date, String cuser, String idtrait, List<Map<String, Object>> FICPOST, Long m) {
+    private void savePost250202019v1(String fichier, String etab, String date, String cuser, String idtrait, List<Map<String, Object>> FICPOST, Long m, String cloture) {
         String p = "";
         List<Map<String, Object>> post = findByPostv1();
         int re = 0;
@@ -873,7 +895,9 @@ public class ReportCalculateServiceImpl extends GlobalService implements ReportC
                     List<String> st = separeteDataPost(formule);
                     if (st.size() != 1) {
                         for (int f = 1; f < st.size(); f++) {
-                            ret.add(st.get(f));
+                            if (st.get(f) != null) {
+                                ret.add(st.get(f).trim());
+                            }
                         }
                         ret1 = ret;
                         pr = findByAttv1(ret);
@@ -887,11 +911,15 @@ public class ReportCalculateServiceImpl extends GlobalService implements ReportC
                     result = "0";
                 } else {
                     if (!rr.isEmpty()) {//when the post exist in rppost table
+                        String d = date;
+                        if (ret1.contains("Date-1")) {
+                            d = cloture;
+                        }
                         if (pr.containsKey("cmdt") && ((List<String>) pr.get("cmdt")).size() > 0) {
                             System.out.println("Treatment in External table ");
-                            result = calcBySoldtablesv1(rr, pr, date);
+                            result = calcBySoldtablesv1(rr, pr, d);
                         } else {
-                            result = calcBySoldv2(rr, condition, date, p, ret1);
+                            result = calcBySoldv2(rr, condition, d, p, ret1);
                         }
 
                     } else {
@@ -907,7 +935,9 @@ public class ReportCalculateServiceImpl extends GlobalService implements ReportC
                     re++;
                 }
             }
-            et.add(globalpostqury);
+            if (globalpostqury != "") {
+                et.add(globalpostqury);
+            }
             lotSavingCalcule(et, date, idtrait, fichier, 50L);
         }
     }
@@ -921,6 +951,7 @@ public class ReportCalculateServiceImpl extends GlobalService implements ReportC
         }
         return rr;
     }
+
     @Autowired
     LiveTraitementRepositoryS liveTraitementRepositoryS;
 
@@ -943,26 +974,33 @@ public class ReportCalculateServiceImpl extends GlobalService implements ReportC
             service.execute(new Runnable() {
                 @Transactional
                 public void run() {
-                    List<Map<String, Object>> PPP = jdbcTemplate.queryForList(globalpostqury);
-                    List<ReportResultTmp> rr = new ArrayList<>();
                     Long e = 0L;
-                    for (Map<String, Object> y : PPP) {
-                        rr.add(new ReportResultTmp(
-                                new Long(y.get("rang").toString()),
-                                y.get("field").toString(),
-                                y.get("post").toString(),
-                                gg, 0L, y.get("col").toString(),
-                                y.get("typeval").toString(),
-                                y.get("result"),
-                                y.get("divd"),
-                                date,
-                                y.get("fichi").toString())
-                        );
-                        e = e + 1;
+                    try {
+                        List<Map<String, Object>> PPP = jdbcTemplate.queryForList(globalpostqury);
+                        List<ReportResultTmp> rr = new ArrayList<>();
+
+                        for (Map<String, Object> y : PPP) {
+                            rr.add(new ReportResultTmp(
+                                    new Long(y.get("rang").toString()),
+                                    y.get("field").toString(),
+                                    y.get("post").toString(),
+                                    gg, 0L, y.get("col").toString(),
+                                    y.get("typeval").toString(),
+                                    y.get("result"),
+                                    y.get("divd"),
+                                    date,
+                                    y.get("fichi").toString())
+                            );
+                            e = e + 1;
+                        }
+                        System.out.println("Start Saving :" + rr.size());
+                        rr = reportResultTmpRepository.save(rr);
+                        liveTraitementRepositoryS.updatelivetreatm(prog, fichier, e);
+                    } catch (Exception r) {
+                        System.out.println(r.getMessage());
+                        System.out.println(e);
+                        System.out.println(globalpostqury);
                     }
-                    System.out.println("Start Saving :" + rr.size());
-                    rr = reportResultTmpRepository.save(rr);
-                    liveTraitementRepositoryS.updatelivetreatm(prog, fichier, e);
                 }
             });
         }
@@ -1181,7 +1219,7 @@ public class ReportCalculateServiceImpl extends GlobalService implements ReportC
     }
 
     public String getTimes() throws ClassNotFoundException, JSONException, SQLException {
-        return getGenerationAndSavingParam().get("AvergeTimeCoef");
+        return "0";//getGenerationAndSavingParam().get("AvergeTimeCoef");
 
     }
 
@@ -2014,6 +2052,8 @@ public class ReportCalculateServiceImpl extends GlobalService implements ReportC
                 PARAM.put("result", ppp);
                 PARAM.put("size", gg);
                 PARAM.put("sql", result.getString("lib5"));
+                System.out.println("directGenerate :" + result.getString("taux5"));
+                PARAM.put("directGenerate", result.getString("taux5"));
             }
             if (ee == 0) {
                 System.out.println("noting found for this request :" + select);
@@ -2129,14 +2169,17 @@ public class ReportCalculateServiceImpl extends GlobalService implements ReportC
     }
 
     @Transactional
-    public int findBySql3(String sql, String d, String f, String p, String se, Statement r, String ryy, Long idOpe,String etab) throws SQLException, ClassNotFoundException {
+    public int findBySql3(String sql, String d, String f, String p, String se, Statement r, String ryy, Long idOpe, String etab) throws SQLException, ClassNotFoundException {
         ResultSet rsp = r.executeQuery("select login,pass,lib1,lib2 from pwd where acscd = '" + se.trim() + "'");
         ResultSet rs = null;
         ResultSet rs1 = null;
         Statement rtt = null;
+        ExecutorService service = Executors.newFixedThreadPool(10);//eg 15 dat and divid 4 
+
         jdbcTemplate.update("DELETE from sqltype where dar = to_date('" + d + "','yyyy-mm-dd') and fichi ='" + f + "'");
         int o = 0;
         Long total = 0L;
+        List<String[]> list1 = new ArrayList<String[]>();
         try {
             while (rsp.next()) {
                 byte[] decoder = Base64.getDecoder().decode(rsp.getString("pass"));
@@ -2151,21 +2194,255 @@ public class ReportCalculateServiceImpl extends GlobalService implements ReportC
             int Friqunce = (int) Math.ceil(total / 100.0);
             liveReportingService.beginDetailsReportingToTheVue2(idOpe, f, new Long(total));
             int y = 0;
+            int y1 = 0;
+            String te = "";
             int s = Integer.parseInt(p);
+            List<String> list = new ArrayList<String>();
+
             while (rs.next()) {
                 y++;
+                y1++;
                 String sqlput = "";
                 String sqlput1 = "";
                 for (int i = 1; i <= s; i++) {
                     sqlput += (i == 1 ? "" : ",") + "col" + i;
-                    sqlput1 += (i == 1 ? "" : ",") + "'" + (rs.getString("col" + i) == null ? "" : rs.getString("col" + i).replaceAll("\\'", "\\''")) + "'";
+                    sqlput1 += (i == 1 ? "" : ",") + "'" + (rs.getString(i) == null ? "" : rs.getString(i).replaceAll("\\'", "\\''")) + "'";
                 }
-                jdbcTemplate.execute("INSERT INTO sqltype (" + sqlput + ",dar,fichi,etab)values(" + sqlput1 + ",to_date('" + d
-                        + "','yyyy-mm-dd'),'" + f + "','"+etab+"')");
-                if (y % Friqunce == 0) {
-                    liveReportingService.detailsReportingToTheVue3(ryy, f, new Long(Friqunce));
+                list.add("INSERT INTO sqltype (" + sqlput + ",dar,fichi,etab)values(" + sqlput1 + ",to_date('" + d + "','yyyy-mm-dd'),'" + f + "','" + etab + "')");
+                if (y1 % 5000 == 0) {
+                    String[] yyy = list.toArray(new String[0]);
+                    service.execute(new Runnable() {
+                        @Transactional
+                        public void run() {
+                            try {
+                                System.out.println("Starting save ");
+                                jdbcTemplate.batchUpdate(yyy);
+                                liveReportingService.detailsReportingToTheVue3(ryy, f, 5000L);
+                                System.out.println("ending Saving :");
+                            } catch (Exception r) {
+                                System.out.println(r.getMessage());
+                            }
+                        }
+                    });
+//                    jdbcTemplate.batchUpdate(list.toArray(new String[0]));
+                    System.out.println("the quantity alread in " + y1);
+//                    list1.add(list.toArray(new String[0]));
+                    list.clear();
                 }
             }
+            if (list.size() > 0) {
+                System.out.println(" get the rest left");
+//                jdbcTemplate.batchUpdate(list.toArray(new String[0]));
+                System.out.println("its oke :" + list.size());
+                String[] yyy = list.toArray(new String[0]);
+                service.execute(new Runnable() {
+                    @Transactional
+                    public void run() {
+                        try {
+                            System.out.println("starting save :");
+                            jdbcTemplate.batchUpdate(yyy);
+                            liveReportingService.detailsReportingToTheVue3(ryy, f, new Long(yyy.length));
+                            System.out.println("ending Saving :");
+                        } catch (Exception r) {
+                            System.out.println(r.getMessage());
+                        }
+                    }
+                });
+                list.clear();
+            }
+            service.shutdown();
+            try {
+                service.awaitTermination(Long.MAX_VALUE, TimeUnit.MILLISECONDS);
+            } catch (InterruptedException e) {
+                System.out.println("Yann service did not terminate");
+                e.printStackTrace();
+            }
+
+            if (rs != null) {
+                rs.close();
+            }
+            if (rs1 != null) {
+                rs1.close();
+            }
+            if (rtt != null) {
+                rtt.close();
+            }
+        } catch (SQLSyntaxErrorException e) {
+            System.out.println("inserted query Error in File " + f + " : " + e.getMessage());
+        }
+        lotsavequery(list1, f, ryy, 5000);
+        return o;
+
+    }
+
+    private void lotsavequery(List<String[]> tttt, String f, String ryy, Integer t) throws NumberFormatException, DataAccessException {
+        ExecutorService service = Executors.newFixedThreadPool(10);//eg 15 dat and divid 4 
+        for (String[] globalpostqury : tttt) {
+            service.execute(new Runnable() {
+                @Transactional
+                public void run() {
+                    try {
+                        jdbcTemplate.batchUpdate(globalpostqury);
+                        liveReportingService.detailsReportingToTheVue3(ryy, f, 5000L);
+                        System.out.println("Start Saving :");
+                    } catch (Exception r) {
+                        System.out.println(r.getMessage());
+                        System.out.println(globalpostqury);
+                    }
+                }
+            });
+        }
+        service.shutdown();
+        try {
+            service.awaitTermination(Long.MAX_VALUE, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            System.out.println("Yann service did not terminate");
+            e.printStackTrace();
+        }
+
+    }
+
+//1201
+    @Transactional
+    public int findBySql5(String sql, String d, String f, String p, String se, Statement r, String ryy, Long idOpe, String etab) throws SQLException, ClassNotFoundException {
+        ResultSet rsp = r.executeQuery("select login,pass,lib1,lib2 from pwd where acscd = '" + se.trim() + "'");
+        ResultSet rs = null;
+        ResultSet rs1 = null;
+        Statement rtt = null;
+        jdbcTemplate.update("DELETE from sqltype where dar = to_date('" + d + "','yyyy-mm-dd') and fichi ='" + f + "'");
+        int o = 0;
+        Long total = 0L;
+        try {
+            while (rsp.next()) {//only one connection
+                byte[] decoder = Base64.getDecoder().decode(rsp.getString("pass"));
+                String v = new String(decoder);
+                Class.forName(rsp.getString("lib2"));
+                rtt = DriverManager.getConnection(rsp.getString("lib1"), rsp.getString("login"), v).createStatement();
+                rs1 = rtt.executeQuery("select count(*) r from (" + sql + ")");
+                rs1.next();
+                total = new Long(rs1.getString("r"));
+                rsp = r.executeQuery("select * from sanm where tabcd = '' and dele =''");
+                while (rsp.next()) {//for the different agence
+                    rs = rtt.executeQuery(sql.replaceAll("key", rsp.getString("key")));
+                    int Friqunce = (int) Math.ceil(total / 100.0);
+                    liveReportingService.beginDetailsReportingToTheVue2(idOpe, f, new Long(total));
+                    int y = 0;
+                    int y1 = 0;
+                    String te = "";
+                    int s = Integer.parseInt(p);
+                    List<String> list = new ArrayList<String>();
+                    while (rs.next()) {
+                        y++;
+                        y1++;
+                        String sqlput = "";
+                        String sqlput1 = "";
+                        for (int i = 1; i <= s; i++) {
+                            sqlput += (i == 1 ? "" : ",") + "col" + i;
+                            sqlput1 += (i == 1 ? "" : ",") + "'" + (rs.getString(i) == null ? "" : rs.getString(i).replaceAll("\\'", "\\''")) + "'";
+                        }
+
+//                jdbcTemplate.execute("INSERT INTO sqltype (" + sqlput + ",dar,fichi,etab)values(" + sqlput1 + ",to_date('" + d
+//                        + "','yyyy-mm-dd'),'" + f + "','"+etab+"')");
+                        list.add("INSERT INTO sqltype (" + sqlput + ",dar,fichi,etab)values(" + sqlput1 + ",to_date('" + d + "','yyyy-mm-dd'),'" + f + "','" + etab + "')");
+                        if (y % Friqunce == 0) {
+
+//                    System.out.println(Friqunce + " autity in " + (System.na - Starttime));
+//                    Starttime = System.nanoTime();
+                            liveReportingService.detailsReportingToTheVue3(ryy, f, new Long(Friqunce));
+                        }
+
+                        if (y1 % 1000 == 0) {
+                            jdbcTemplate.batchUpdate(list.toArray(new String[0]));
+                            list.clear();
+                        }
+                    }
+                    if (te != "") {
+                        System.out.println(" get the rest left");
+                        jdbcTemplate.batchUpdate(list.toArray(new String[0]));
+                        list.clear();
+                    }
+
+                }
+                if (rs != null) {
+                    rs.close();
+                }
+                if (rs1 != null) {
+                    rs1.close();
+                }
+                if (rtt != null) {
+                    rtt.close();
+                }
+            }
+        } catch (SQLSyntaxErrorException e) {
+            System.out.println("inserted query Error in File " + f + " : " + e.getMessage());
+        }
+        return o;
+
+    }
+
+    @Transactional
+    public int findBySql4(String sql, String d, String f, String p, String se, Statement r, String ryy, Long idOpe, String etab) throws SQLException, ClassNotFoundException {
+        ResultSet rsp = r.executeQuery("select login,pass,lib1,lib2 from pwd where acscd = '" + se.trim() + "'");
+        ResultSet rs = null;
+        ResultSet rs1 = null;
+        Statement rtt = null;
+        jdbcTemplate.update("DELETE from sqltype where dar = to_date('" + d + "','yyyy-mm-dd') and fichi ='" + f + "'");
+        int o = 0;
+        Long total = 0L;
+        List<String> roo = new ArrayList<>();
+        try {
+            while (rsp.next()) {
+                byte[] decoder = Base64.getDecoder().decode(rsp.getString("pass"));
+                String v = new String(decoder);
+                Class.forName(rsp.getString("lib2"));
+                rtt = DriverManager.getConnection(rsp.getString("lib1"), rsp.getString("login"), v).createStatement();
+                rs1 = rtt.executeQuery("select count(*) r from (" + sql + ")");
+                rs1.next();
+                total = new Long(rs1.getString("r"));
+                rs = rtt.executeQuery(sql);
+            }
+            int Friqunce = (int) Math.ceil(total / 100.0);
+            liveReportingService.beginDetailsReportingToTheVue2(idOpe, f, new Long(total));
+            int y = 0;
+            int y1 = 0;
+            String te = "";
+            int s = Integer.parseInt(p);
+//            Long Starttime = System.nanoTime();
+            while (rs.next()) {
+                y++;
+                y1++;
+                String sqlput = "";
+                String sqlput1 = "";
+                for (int i = 1; i <= s; i++) {
+                    sqlput += (i == 1 ? "" : ",") + "col" + i;
+                    sqlput1 += (i == 1 ? "" : ",") + "'" + (rs.getString(i) == null ? "" : rs.getString(i).replaceAll("\\'", "\\''")) + "'";
+                }
+
+//                jdbcTemplate.execute("INSERT INTO sqltype (" + sqlput + ",dar,fichi,etab)values(" + sqlput1 + ",to_date('" + d
+//                        + "','yyyy-mm-dd'),'" + f + "','"+etab+"')");
+                te += " INTO sqltype (" + sqlput + ",dar,fichi,etab)values(" + sqlput1 + ",to_date('" + d + "','yyyy-mm-dd'),'" + f + "','" + etab + "')";
+                if (y % Friqunce == 0) {
+
+//                    System.out.println(Friqunce + " autity in " + (System.na - Starttime));
+//                    Starttime = System.nanoTime();
+                    liveReportingService.detailsReportingToTheVue3(ryy, f, new Long(Friqunce));
+                }
+
+                if (y1 % 300 == 0) {
+                    te = "INSERT All " + te + " SELECT 1 FROM DUAL";
+//                    jdbcTemplate.execute(te);
+                    roo.add(te);
+                    te = "";
+                }
+            }
+            if (te != "") {
+                System.out.println(" get the rest left");
+                te = "INSERT All " + te + "SELECT 1 FROM DUAL";
+//                jdbcTemplate.execute(te);
+                roo.add(te);
+            }
+
+            lotsave(roo);
             if (rs != null) {
                 rs.close();
             }
@@ -2182,6 +2459,84 @@ public class ReportCalculateServiceImpl extends GlobalService implements ReportC
 
     }
 
+    private void lotsave(List<String> tttt) throws NumberFormatException, DataAccessException {
+        ExecutorService service = Executors.newFixedThreadPool(10);//eg 15 dat and divid 4 
+        for (String globalpostqury : tttt) {
+            service.execute(new Runnable() {
+                @Transactional
+                public void run() {
+                    try {
+                        jdbcTemplate.execute(globalpostqury);
+                        System.out.println("Start Saving :");
+                    } catch (Exception r) {
+                        System.out.println(r.getMessage());
+                        System.out.println(globalpostqury);
+                    }
+                }
+            });
+        }
+        service.shutdown();
+        try {
+            service.awaitTermination(Long.MAX_VALUE, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            System.out.println("Yann service did not terminate");
+            e.printStackTrace();
+        }
+
+    }
+
+//    public int findBySql3(String sql, String d, String f, String p, String se, Statement r, String ryy, Long idOpe,String etab) throws SQLException, ClassNotFoundException {
+//        ResultSet rsp = r.executeQuery("select login,pass,lib1,lib2 from pwd where acscd = '" + se.trim() + "'");
+//        ResultSet rs = null;
+//        ResultSet rs1 = null;
+//        Statement rtt = null;
+//        jdbcTemplate.update("DELETE from sqltype where dar = to_date('" + d + "','yyyy-mm-dd') and fichi ='" + f + "'");
+//        int o = 0;
+//        Long total = 0L;
+//        try {
+//            while (rsp.next()) {
+//                byte[] decoder = Base64.getDecoder().decode(rsp.getString("pass"));
+//                String v = new String(decoder);
+//                Class.forName(rsp.getString("lib2"));
+//                rtt = DriverManager.getConnection(rsp.getString("lib1"), rsp.getString("login"), v).createStatement();
+//                rs1 = rtt.executeQuery("select count(*) r from (" + sql + ")");
+//                rs1.next();
+//                total = new Long(rs1.getString("r"));
+//                rs = rtt.executeQuery(sql);
+//            }
+//            int Friqunce = (int) Math.ceil(total / 100.0);
+//            liveReportingService.beginDetailsReportingToTheVue2(idOpe, f, new Long(total));
+//            int y = 0;
+//            int s = Integer.parseInt(p);
+//            while (rs.next()) {
+//                y++;
+//                String sqlput = "";
+//                String sqlput1 = "";
+//                for (int i = 1; i <= s; i++) {
+//                    sqlput += (i == 1 ? "" : ",") + "col" + i;
+//                    sqlput1 += (i == 1 ? "" : ",") + "'" + (rs.getString("col" + i) == null ? "" : rs.getString("col" + i).replaceAll("\\'", "\\''")) + "'";
+//                }
+//                jdbcTemplate.execute("INSERT INTO sqltype (" + sqlput + ",dar,fichi,etab)values(" + sqlput1 + ",to_date('" + d
+//                        + "','yyyy-mm-dd'),'" + f + "','"+etab+"')");
+//                if (y % Friqunce == 0) {
+//                    liveReportingService.detailsReportingToTheVue3(ryy, f, new Long(Friqunce));
+//                }
+//            }
+//            if (rs != null) {
+//                rs.close();
+//            }
+//            if (rs1 != null) {
+//                rs1.close();
+//            }
+//            if (rtt != null) {
+//                rtt.close();
+//            }
+//        } catch (SQLSyntaxErrorException e) {
+//            System.out.println("inserted query Error in File " + f + " : " + e.getMessage());
+//        }
+//        return o;
+//
+//    }
     public BigDecimal separeteDataTrait(String formule, String etab, String fichier, String date)
             throws ParseException {
         BigDecimal ret = DEFAULT_FOOBAR_VALUE;
@@ -2507,9 +2862,14 @@ public class ReportCalculateServiceImpl extends GlobalService implements ReportC
         BigDecimal ret = DEFAULT_FOOBAR_VALUE;
         BigDecimal rt = DEFAULT_FOOBAR_VALUE;
         try {
-            return new BigDecimal(formule);
+            if (formule == null) {
+                return new BigDecimal("0");
+            }
+            return new BigDecimal(formule.trim());
         } catch (NumberFormatException nfe) {
-
+            if (formule.trim().isEmpty()) {
+                return new BigDecimal("0");
+            }
             formule = formule.replaceAll(" ", "");
 
             System.out.println("tebit formular:" + formule);
@@ -2791,7 +3151,9 @@ public class ReportCalculateServiceImpl extends GlobalService implements ReportC
                 }
 //                liveReportingService.detailsReportingToTheVue2(idtrait, fichier, minimum);
             }
-            et.add(globalpostqury);
+            if (globalpostqury != "") {
+                et.add(globalpostqury);
+            }
             lotSavingCalcule(et, date, idtrait, fichier, 50L);
         }
 

@@ -101,6 +101,16 @@ public interface ReportRepRepository extends CrudRepository<ReportRep, Long>, Jp
             + "					where g.fichier = ?1 \n"
             + "			     ) e on f.poste = e.post and f.fich = e.fichier and f.col=e.col  ORDER BY  f.rang Asc, f.col ", nativeQuery = true)
     List<ReportRep> preparedResult12(String fich, String d);
+@Query(value = "SELECT f.col,f.crdt,f.cuser,e.dele,e.doc,f.etab,e.feuille,f.fich fichier,e.field,e.mdfi,e.muser,f.poste post, \n"
+            + "					 (case when (f.gen = '***') then f.gen else e.valc end) valc,e.valm,e.valt,e.vald\n"
+            + "			      ,e.crtd, e.dar,e.feild,e.filter,e.sens,f.rang,f.id,(case when(status is null)then 0 else status end )status\n"
+            + "                     FROM (select * from rppfich j where j.fich = ?1) f\n"
+            + "			      left join (select g.* from (select * from rprep where fichier =?1 AND dar = to_date(?2,'yyyy-mm-dd'))g\n"
+            + "				   inner join(select post,fichier,col from rprep where fichier = ?1 and dar = to_date(?2,'yyyy-mm-dd') group by fichier,post,col having count(*)=1)q\n"
+            + "				    on q.fichier = g.fichier and q.post = g.post and q.col = g.col\n"
+            + "					where g.fichier = ?1 \n"
+            + "			     ) e on f.poste = e.post and f.fich = e.fichier and f.col=e.col  ORDER BY  f.rang Asc, f.col ", nativeQuery = true)
+    List<ReportRep> extractReport(String fich, String d);
 
 
     @Query(value = " SELECT f.col,f.crdt,f.cuser,e.dele,e.doc,f.etab,e.feuille,f.fich fichier,e.field,e.mdfi,e.muser,f.poste post, \n"

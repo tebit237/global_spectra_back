@@ -83,6 +83,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.math.BigInteger;
+import java.sql.Types;
 import java.text.DateFormat;
 import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServletResponse;
@@ -296,7 +297,7 @@ public class ReportParameters {
         if (ryy.size() == 0) {
             //add in r+1
             Long rg = r.get(0).getRang();
-            jdbcTemplate.update("update rppfich set rang = rang+ 1 where rang >" + rg);
+            jdbcTemplate.update("update rppfich set rang = rang+ 1 where rang >" + rg + " and fich = '" + fich + "'");
             Long o = reportFileRepository.getMax().get(0).longValue();
             System.out.println("max id is " + o);
             for (ReportFile t : r) {
@@ -311,6 +312,57 @@ public class ReportParameters {
                 y.setPoste(addingPost);
                 y.setTfic(t.getTfic());
                 y.setRang(rg + 1);
+                y.setId(++o);
+                reportFileRepository.save(y);
+            }
+        }
+        List<ReportCalculateS2> rty = reportCalculateIdRepositoryS.findByFilePost(fich, abovePost);
+        List<ReportCalculateS2> rt = reportCalculateIdRepositoryS.findByFilePost(fich, addingPost);
+        if (rt.size() == 0) {
+            Long ot = reportFileRepository.getMax().get(0).longValue();
+            for (ReportCalculateS2 t : rty) {
+                ReportCalculateS2 y = new ReportCalculateS2();
+                y.setCol(t.getCol());
+                y.setCrdt(t.getCrdt());
+                y.setEtab(t.getEtab());
+                y.setDele(t.getDele());
+                y.setFichi(t.getFichi());
+                y.setDivd(t.getDivd());
+                y.setPost(addingPost);
+                y.setField(t.getField().replaceAll(t.getPost(), addingPost));
+                y.setSource(t.getSource());
+                y.setTypeval(t.getTypeval());
+                y.setTysorce(t.getTysorce());
+                y.setCalc(t.getCalc().replaceAll(t.getPost(), addingPost));
+                y.setId(++ot);
+                reportCalculateIdRepositoryS.save(y);
+            }
+        }
+        return 1;
+    }
+
+    @RequestMapping("/postinsertstructureabov/{fich}/{abovePost}/{addingPost}")
+    public int postinsertstructureabov(@PathVariable String fich, @PathVariable String abovePost, @PathVariable String addingPost, Model model) {
+        List<ReportFile> r = reportFileRepository.getabove(fich, abovePost);
+        List<ReportFile> ryy = reportFileRepository.getabove(fich, addingPost);
+        if (ryy.size() == 0) {
+            //add in r+1
+            Long rg = r.get(0).getRang();
+            jdbcTemplate.update("update rppfich set rang = rang+ 1 where rang >=" + rg + " and fich = '" + fich + "'");
+            Long o = reportFileRepository.getMax().get(0).longValue();
+            System.out.println("max id is " + o);
+            for (ReportFile t : r) {
+                System.out.println("inserting id is " + o);
+                ReportFile y = new ReportFile();
+                y.setCol(t.getCol());
+                y.setCrdt(t.getCrdt());
+                y.setEtab(t.getEtab());
+                y.setFeui(t.getFeui());
+                y.setFich(t.getFich());
+                y.setGen(t.getGen());
+                y.setPoste(addingPost);
+                y.setTfic(t.getTfic());
+                y.setRang(rg);
                 y.setId(++o);
                 reportFileRepository.save(y);
             }
@@ -1089,7 +1141,11 @@ public class ReportParameters {
         ReportControleIntra t = reportControleIntraRepository.findById(id);
         t.setDele("1");
         t = reportControleIntraRepository.save(t);
-        reportControleIntraRepository.deleteById(id);
+        try {
+            reportControleIntraRepository.deleteById(id);
+        } catch (Exception r) {
+            System.out.println("Cant delete the file :" + r);
+        }
         return t;
 
     }
@@ -1344,12 +1400,25 @@ public class ReportParameters {
         return calendar.getTime();
     }
 
+    @Transactional
     @PostMapping(path = "/updateSqlFile")
     public SqlFileType updateSqlFile(@RequestBody SqlFileType sqlFileType) {
         SqlFileType t = sqlFileTypeRepository.findById(sqlFileType.getId());
         if (t.setByColumn1(sqlFileType)) {
             t = sqlFileTypeRepository.save(t);
             return t;
+        } else {
+            return null;
+        }
+    }
+
+    @PostMapping(path = "/updateSqlFile1")
+    public Integer updateSqlFile1(@RequestBody Map<String, String> r) {
+        SqlFileType t = sqlFileTypeRepository.findById(new Long(r.get("id")));
+        if (t != null) {
+            Object[] params = {r.get("value")};
+            int[] types = {Types.VARCHAR};
+            return jdbcTemplate.update("update sqltype set " + r.get("key") + " = ? where id=" + r.get("id"), params, types);
         } else {
             return null;
         }

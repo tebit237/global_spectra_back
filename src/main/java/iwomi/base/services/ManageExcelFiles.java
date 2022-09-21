@@ -7,12 +7,14 @@ package iwomi.base.services;
 
 import iwomi.base.objects.ReportRep;
 import iwomi.base.objects.SqlFileType;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -20,6 +22,7 @@ import java.nio.file.attribute.PosixFileAttributes;
 import java.nio.file.attribute.PosixFilePermission;
 import java.sql.Connection;
 import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.SQLType;
 import java.sql.Statement;
@@ -61,6 +64,7 @@ public class ManageExcelFiles extends GlobalService {
     private SXSSFSheet sheet;
     private int leng;
     private List<String> desp;
+    private List<List> g;
     private List<SqlFileType> listUsers;
     static String SHEET = "Data";
     public static String TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
@@ -70,6 +74,14 @@ public class ManageExcelFiles extends GlobalService {
         this.leng = leng - 1;
         this.listUsers = listData;
         this.desp = headerDescrption;
+        workbook = new SXSSFWorkbook();
+    }
+
+    public ManageExcelFiles(List<List> tt, List<String> h) {
+        System.out.println("the declared ");
+        this.leng = h.size() - 1;
+        this.g = tt;
+        this.desp = h;
         workbook = new SXSSFWorkbook();
     }
 
@@ -249,16 +261,16 @@ public class ManageExcelFiles extends GlobalService {
 
     private void writeHeaderLine() {
         System.out.println("Heading set ");
+        CellStyle style = workbook.createCellStyle();
         sheet = (SXSSFSheet) workbook.createSheet("Data");
         sheet.setRandomAccessWindowSize(100);
         Row row = sheet.createRow(0);
-        CellStyle style = workbook.createCellStyle();
         XSSFFont font = (XSSFFont) workbook.createFont();
         font.setBold(true);
         font.setFontHeight(14);
         style.setFont(font);
         for (int i = 0; i <= leng; i++) {
-            createCell(row, i + 1, desp.get(i), style);
+            createCell(row, i, desp.get(i), style);
         }
     }
 
@@ -282,7 +294,6 @@ public class ManageExcelFiles extends GlobalService {
         XSSFFont font = (XSSFFont) workbook.createFont();
         font.setFontHeight(12);
         style.setFont(font);
-
         for (SqlFileType user : listUsers) {
             if (rowCount % 250 == 0) {
                 System.out.println("starting row " + rowCount + " insertion");
@@ -291,6 +302,28 @@ public class ManageExcelFiles extends GlobalService {
             int columnCount = 1;
             for (int i = 0; i <= leng; i++) {
                 createCell(row, columnCount++, user.cellExtra(i + 1), style);
+            }
+        }
+    }
+
+    private void writeDataLines1() {
+        int rowCount = 1;
+        System.out.println("the lenth is " + leng);
+        CellStyle style = workbook.createCellStyle();
+        XSSFFont font = (XSSFFont) workbook.createFont();
+        font.setFontHeight(12);
+        style.setFont(font);
+
+        for (List user : g) {
+            if (rowCount == 1000000) {
+                sheet = (SXSSFSheet) workbook.createSheet("Data2");
+                sheet.setRandomAccessWindowSize(100);
+                rowCount = 1;
+            }
+            Row row = sheet.createRow(rowCount++);
+            int columnCount = 0;
+            for (int i = 0; i < user.size(); i++) {
+                createCell(row, columnCount++, user.get(i), style);
             }
         }
     }
@@ -309,4 +342,58 @@ public class ManageExcelFiles extends GlobalService {
 
     }
 
+    public ByteArrayInputStream export1() {
+        writeHeaderLine();
+        writeDataLines1();
+        try {
+//            OutputStream outputStream = response.getOutputStream();
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            workbook.write(out);
+            workbook.close();
+            return new ByteArrayInputStream(out.toByteArray());
+        } catch (IOException ex) {
+            Logger.getLogger(ManageExcelFiles.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        return null;
+    }
+
+    public static String etatToExcel2(ResultSet etat) throws Exception {
+        Timestamp timestamp = new Timestamp(System.currentTimeMillis());
+        try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream();) {
+            Sheet sheet = workbook.createSheet(SHEET);
+            // Header
+            Row headerRow = sheet.createRow(0);
+            ResultSetMetaData rsmd = etat.getMetaData();
+            int columnsNumber = rsmd.getColumnCount();
+            for (int i = 1; i <= columnsNumber; i++) {
+                Cell cell = headerRow.createCell(i - 1);
+                cell.setCellValue(rsmd.getColumnName(i));
+            }
+            int rowIdx = 1;
+            int columns = etat.getMetaData().getColumnCount();
+            int er = 0;
+            while (etat.next()) {
+                er++;
+                Row row = sheet.createRow(rowIdx++);
+                for (int i = 0; i < columns; i++) {
+                    row.createCell(i).setCellValue(etat.getObject(i + 1) + "");
+
+                }
+            }
+            String rkn = timestamp.getTime() + "";
+            String fr = "/var/www/html/reporting/ressources/etat/etat" + rkn + ".xlsx";
+            FileOutputStream r = new FileOutputStream(fr);
+            workbook.write(r);
+            r.close();
+            Path path = Paths.get(fr);
+            Set<PosixFilePermission> perms = Files.readAttributes(path, PosixFileAttributes.class).permissions();
+            perms.add(PosixFilePermission.OTHERS_WRITE);
+            perms.add(PosixFilePermission.OTHERS_READ);
+            perms.add(PosixFilePermission.OTHERS_EXECUTE);
+            Files.setPosixFilePermissions(path, perms);
+            return rkn;
+        } catch (IOException e) {
+            throw new RuntimeException("fail to import data to Excel file: " + e.getMessage());
+        }
+    }
 }

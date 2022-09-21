@@ -147,7 +147,9 @@ public class ReportControleServiceImpl extends GlobalService implements ReportCo
             System.out.println("count not get nomenclature 3009");
         }
         for (ReportAnomaly y : r) {
-            if(y.getCtrid()==null)continue;
+            if (y.getCtrid() == null) {
+                continue;
+            }
             ReportControleIntra g = reportControleIntraRepository.findById(y.getCtrid());
             Integer oo = null;
             try {
@@ -1757,11 +1759,26 @@ public class ReportControleServiceImpl extends GlobalService implements ReportCo
 
         private void controlTreatment(String controle_type) throws DataAccessException, NumberFormatException {
             String e = "";
+            String s = "";
+            String g = "";
+            try {
+                Connection r = connectDB();
+                g = "Select lib2 from sanm where tabcd = '0012' and acscd ='0036' and dele = 0";
+                ResultSet tt = r.createStatement().executeQuery(g);
+                tt.next();
+                s = tt.getString("lib2");
+            } catch (SQLException ex) {
+                System.out.println("query has error :" + g);
+            } catch (ClassNotFoundException ex) {
+                System.out.println("class not found:");
+            } catch (JSONException ex) {
+                System.out.println("return json generated error");
+            }
             if (controle_type.equals("intra")) {
-                simpleIntraControl();
+                simpleIntraControl(s);
             }
             if (controle_type.equals("inter")) {
-                simpleInterControl();
+                simpleInterControl(s);
             }
             if (controle_type.equals("CMXPARM")) {
                 configureIntraControl();
@@ -1780,7 +1797,7 @@ public class ReportControleServiceImpl extends GlobalService implements ReportCo
             jdbcTemplate.execute(sql1);
         }
 
-        private void simpleIntraControl() {
+        private void simpleIntraControl(String s) {
             Boolean val = false;
             String sql12 = "delete from rpanom where dar =to_date('" + date + "','yyyy-mm-dd') and type = 'intra'";
             jdbcTemplate.execute(sql12);
@@ -1997,7 +2014,7 @@ public class ReportControleServiceImpl extends GlobalService implements ReportCo
             return uu;
         }
 
-        private void simpleInterControl() throws NumberFormatException, DataAccessException {
+        private void simpleInterControl(String sT) throws NumberFormatException, DataAccessException {
             Boolean val;
             String sql12 = "delete from rpanom where dar =to_date('" + date + "','yyyy-mm-dd') and type = 'inter'";
             jdbcTemplate.execute(sql12);
@@ -2310,7 +2327,6 @@ public class ReportControleServiceImpl extends GlobalService implements ReportCo
             Connection r = connectDB();
             r1 = r.createStatement();
             Map<String, Map<String, String>> yy = getType_v1(r1);
-//            reportCalculateService.connec();
 
             Long idOpe = liveReportingService.beginGobalReportingToTheVue(ssd, etab, cuser, "control",
                     Long.valueOf(controle_typ.size()));
@@ -2674,7 +2690,7 @@ public class ReportControleServiceImpl extends GlobalService implements ReportCo
                 List<String> u = separeteData1(r.substring(sf + 1, r.length()).trim());
                 String sql = "select * from rprep where dar =to_date('" + date + "','yyyy-mm-dd') and fichier='" + r.substring(0, sf).trim() + "' and post='" + u.get(0).trim() + "' and col='"
                         + u.get(1).trim() + "'";
-                System.out.println("query for " + r + " : " + sql);
+//                System.out.println("query for " + r + " : " + sql);
                 List<Map<String, Object>> tmp = jdbcTemplate.queryForList(sql);
                 if (!tmp.isEmpty()) {
                     System.out.println("passé");
@@ -2690,7 +2706,7 @@ public class ReportControleServiceImpl extends GlobalService implements ReportCo
                 }
             }
         }
-        System.out.println("The formule " + formule);
+        System.out.println("The formule " + formule + "  = " + val);
         if (i == 1) {
             rt = new BigDecimal(eval(frm.replaceAll("999999999999999", "0")));
         }

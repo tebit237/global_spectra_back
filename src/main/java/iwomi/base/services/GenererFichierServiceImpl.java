@@ -81,17 +81,22 @@ import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.sql.SQLSyntaxErrorException;
+import java.util.Base64;
 import java.util.Calendar;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import javax.transaction.Transactional;
 import org.apache.poi.EncryptedDocumentException;
+import org.apache.poi.hssf.usermodel.HSSFFormulaEvaluator;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 /**
@@ -100,7 +105,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @Service
-public class GenererFichierServiceImpl implements GenererFichierServices {
+public class GenererFichierServiceImpl extends GlobalService implements GenererFichierServices {
 
     Connection connection, con = null;
 //    public static final String USERNAME="root";
@@ -846,7 +851,7 @@ public class GenererFichierServiceImpl implements GenererFichierServices {
             } catch (ParseException ex) {
                 System.out.println("Date (yyyy-MM-dd) Could not be formated " + fic.getDate());
             }
-            if (parameters.get("typeReporting").equalsIgnoreCase("1")) {
+            if (parameters.get("typeReporting").equalsIgnoreCase("2")) {
 
                 if (typefile.get("result").equals("calculate")) {
                     calculation(fic, i, CONST, defineFileToSave, fileName, typefile, dropdown, count);
@@ -855,9 +860,15 @@ public class GenererFichierServiceImpl implements GenererFichierServices {
                 } else if (typefile.get("result").equals("duplicate")) {
                     duplicateFile(fic, i, CONST, defineFileToSave, fileName, typefile, dropdown, count);
                 } else if (typefile.get("result").equals("sql")) {
-                    fileName = sqlTypeFile(fic, i, defineFileToSave, fileName, typefile, count);
+                    System.out.println("file is :" + fileName);
+                    if (typefile.get("directGenerate") != null && typefile.get("directGenerate").equalsIgnoreCase("1")) {
+                        fileName = sqlTypeFileDirect(fic, i, defineFileToSave, fileName, typefile, count);
+                    } else {
+                        fileName = sqlTypeFile(fic, i, defineFileToSave, fileName, typefile, count);
+                    }
                 }
-            } else if (parameters.get("typeReporting").equalsIgnoreCase("2")) {
+                System.out.println("file is :" + fileName);
+            } else if (parameters.get("typeReporting").equalsIgnoreCase("1")) {
                 ManageExcelFiles se = new ManageExcelFiles();
                 String file = "";
                 try {
@@ -866,15 +877,14 @@ public class GenererFichierServiceImpl implements GenererFichierServices {
                 } catch (Exception ex) {
                     Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
                 }
-//                fileName = fic.getDate() + '/' + fic.getCodeFichier().get(i).getCode() + ".xlsx";
                 if (typefile.get("result").equals("calculate")) {
                     calculationSesame(fic, i, CONST, defineFileToSave, fileName, typefile, dropdown, count, file);
                 } else if (typefile.get("result").equals("duplicateNoPost")) {
-                    duplicatePostFile(fic, i, CONST, defineFileToSave, fileName, typefile, dropdown, count);
+                    duplicatePostFileSesame(fic, i, CONST, defineFileToSave, fileName, typefile, dropdown, count, file);
                 } else if (typefile.get("result").equals("duplicate")) {
-                    duplicateFile(fic, i, CONST, defineFileToSave, fileName, typefile, dropdown, count);
+                    duplicateFileSesame(fic, i, CONST, defineFileToSave, fileName, typefile, dropdown, count, file);
                 } else if (typefile.get("result").equals("sql")) {
-                    fileName = sqlTypeFile(fic, i, defineFileToSave, fileName, typefile, count);
+                    sqlSesame(fic, i, defineFileToSave, fileName, typefile, count, file);
                 }
             }
             GenFile fu;
@@ -899,6 +909,7 @@ public class GenererFichierServiceImpl implements GenererFichierServices {
             Long statut;
             BufferedWriter writer;
             List<SqlFileType> reportDatasGenerated3 = sqlFileTypeRepository.findSqlFileTypeByDarAndFichi(fic1.getDate(), fic1.getCodeFichier().get(i1).getCode());
+
             if (reportDatasGenerated3.size() > 0) {
                 liveReportingServicef.beginDetailsReportingToTheVue2(idOpe, fic1.getCodeFichier().get(i1).getCode(), new Long(reportDatasGenerated3.size()));
                 int Friqunce = (int) Math.ceil(reportDatasGenerated3.size() / 100.0);
@@ -940,7 +951,6 @@ public class GenererFichierServiceImpl implements GenererFichierServices {
                         int t = Integer.parseInt(typefile.get("size"));
                         lineFile = "";
                         for (int p = 1; p <= t; p++) {
-
                             lineFile += (reportDatasGenerated3.get(j).cellExtra(p) == null ? "" : reportDatasGenerated3.get(j).cellExtra(p)) + (p == t ? "" : ";");
                         }
                         fileOutputStream.write(lineFile.getBytes(StandardCharsets.UTF_8));
@@ -1002,6 +1012,256 @@ public class GenererFichierServiceImpl implements GenererFichierServices {
                 } catch (Exception ex) {
                     Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
                 }
+            }
+            return fileName1;
+        }
+
+        @Transactional
+        public Integer countQuery(String sql, String se, Statement r) throws SQLException, ClassNotFoundException {
+
+            ResultSet rsp = r.executeQuery("select login,pass,lib1,lib2 from pwd where acscd = '" + se.trim() + "'");
+            ResultSet rs1 = null;
+            Statement rtt = null;
+            int o = 0;
+            Long total = 0L;
+            List<String[]> list1 = new ArrayList<String[]>();
+            while (rsp.next()) {
+                byte[] decoder = Base64.getDecoder().decode(rsp.getString("pass"));
+                String v = new String(decoder);
+                Class.forName(rsp.getString("lib2"));
+                rtt = DriverManager.getConnection(rsp.getString("lib1"), rsp.getString("login"), v).createStatement();
+                rs1 = rtt.executeQuery("select count(*) r from (" + sql + ")");
+                rs1.next();
+                return Integer.parseInt(rs1.getString("r"));
+            }
+            return 0;
+        }
+
+        @Transactional
+        public Statement DataDirect(String se, Statement r) throws SQLException, ClassNotFoundException {
+            ResultSet rsp = r.executeQuery("select login,pass,lib1,lib2 from pwd where acscd = '" + se.trim() + "'");
+            ResultSet rs1 = null;
+            Statement rtt = null;
+            int o = 0;
+            Long total = 0L;
+            List<String[]> list1 = new ArrayList<String[]>();
+            while (rsp.next()) {
+                byte[] decoder = Base64.getDecoder().decode(rsp.getString("pass"));
+                String v = new String(decoder);
+                Class.forName(rsp.getString("lib2"));
+                return DriverManager.getConnection(rsp.getString("lib1"), rsp.getString("login"), v).createStatement();
+//                return rtt.executeQuery(sql);
+
+            }
+            return null;
+        }
+
+        private String sqlTypeFileDirect1(GenererFichierForm fic1, int i1, int defineFileToSave1, String fileName1, Map<String, String> typefile, Long count1) throws NumberFormatException {
+            String lineFile;
+            BufferedWriter writer;
+            String query = "";
+            Integer countQuery = 0;
+            ResultSet datao = null;
+            try {
+                ResultSet yy = r.executeQuery("select lib5,lib4 from sanm where tabcd = '3009' and dele=0 and lib2 = '" + fic1.getCodeFichier().get(i1).getCode() + "'");
+                yy.next();
+                String ppep = yy.getString("lib4");
+                query = reportCalculateService.insertPeriodsValiables(yy.getString("lib5").replaceAll("//dar//", "to_date('" + fic1.getDate() + "','yyyy-mm-dd')"), r);
+                countQuery = 1800000;//countQuery(query, ppep, r);
+                System.out.println("total :" + countQuery);
+                int oo = 150000;
+                if (countQuery > 0) {
+                    int tt = (countQuery / oo) + 1;
+                    System.out.println("segment number :" + tt);
+                    Statement g = r;
+                    String ruu = query;
+                    ExecutorService service = Executors.newFixedThreadPool(10);//eg 15 dat and divid 4 
+                    liveReportingServicef.beginDetailsReportingToTheVue2(idOpe, fic1.getCodeFichier().get(i1).getCode(), new Long(countQuery));
+                    for (int uu = 0; uu < tt; uu++) {
+                        int y = uu;
+                        System.out.println("run :" + uu);
+                        service.execute(new Runnable() {
+                            public void run() {
+                                System.out.println("process : " + y);
+                            }
+                        });
+                        liveReportingServices.endDetailsReportingToTheVue2(fic1.getCodeUnique(), fic1.getCodeFichier().get(i1).getCode(), 1L, new Long(countQuery), new Long(countQuery));
+                        service.shutdown();
+
+                        try {
+                            service.awaitTermination(Long.MAX_VALUE, TimeUnit.MILLISECONDS);
+                        } catch (InterruptedException e) {
+                            System.out.println("Yann service did not terminate");
+                            e.printStackTrace();
+                        }
+
+                    }
+                } else {
+                    liveReportingServicef.beginDetailsReportingToTheVue2(idOpe, fic1.getCodeFichier().get(i1).getCode(), 1L);
+                    Path e = null;
+                    try {
+                        try {
+                            e = Files.createFile(Paths.get(parameters.get("chemin") + fileName1));
+                        } catch (FileAlreadyExistsException ey) {
+                            e = Paths.get(parameters.get("chemin") + fileName1);
+                        }
+                        writer = Files.newBufferedWriter(e, StandardCharsets.ISO_8859_1);
+                        defineFileToSave1 = 0;
+                        String ActualDate = "";
+                        ActualDate = getDateAtTheGoodformat1(fic1.getDate());
+                        lineFile = parameters.get("idetab") + parameters.get("delimiteur")
+                                + parameters.get("codePays") + parameters.get("delimiteur")
+                                + parameters.get("status") + parameters.get("delimiteur") + ActualDate
+                                + parameters.get("delimiteur") + fic1.getCodeFichier().get(i1).getCode();
+                        writer.write(lineFile);
+                        writer.close();
+                        liveReportingServices.endDetailsReportingToTheVue2(fic1.getCodeUnique(), fic1.getCodeFichier().get(i1).getCode(), 1L, 1L, 1L);
+                    } catch (Exception ex) {
+                        Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
+                    }
+                }
+
+                if (countQuery > 0) {
+                } else {
+
+                }
+            } catch (SQLException ex) {
+                Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
+            } catch (ClassNotFoundException ex) {
+                Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
+            }
+            return fileName;
+        }
+
+        private String sqlTypeFileDirect(GenererFichierForm fic1, int i1, int defineFileToSave1, String fileName1, Map<String, String> typefile, Long count1) throws NumberFormatException {
+            String lineFile;
+            BufferedWriter writer;
+            String query = "";
+            Integer countQuery = 0;
+            ResultSet datao = null;
+            try {
+                ResultSet yy = r.executeQuery("select lib5,lib4 from sanm where tabcd = '3009' and dele=0 and lib2 = '" + fic1.getCodeFichier().get(i1).getCode() + "'");
+                yy.next();
+                String ppep = yy.getString("lib4");
+                query = reportCalculateService.insertPeriodsValiables(yy.getString("lib5").replaceAll("//dar//", "to_date('" + fic1.getDate() + "','yyyy-mm-dd')"), r);
+                countQuery = countQuery(query, ppep, r);
+                System.out.println("number :" + countQuery);
+                datao = DataDirect(ppep, r).executeQuery(query);
+//                while(datao.next()){
+//                System.out.println("number :y -----------");
+//                }
+
+                if (countQuery > 0) {
+                    liveReportingServicef.beginDetailsReportingToTheVue2(idOpe, fic1.getCodeFichier().get(i1).getCode(), new Long(countQuery));
+                    int Friqunce = (int) Math.ceil(countQuery / 100.0);
+                    CONST = 0;
+                    try {
+                        FileOutputStream fileOutputStream = null;
+                        int j = 0;
+                        while (datao.next()) {
+                            j++;
+                            if (defineFileToSave1 == 0) {
+                                try {
+                                    fileName1 = getYearMonth2(fic1.getDate()) + fic1.getCodeFichier().get(i1).getCode() + parameters.get("idetab") + "." + parameters.get("extention");
+                                    System.out.println("FILE NAME " + fileName1);
+                                } catch (ParseException ex) {
+                                    Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null,
+                                            ex);
+                                }
+                                Path e = null;
+                                try {
+                                    e = Files.createFile(Paths.get(parameters.get("chemin") + fileName1));
+                                } catch (FileAlreadyExistsException ey) {
+                                    e = Paths.get(parameters.get("chemin") + fileName1);
+                                }
+                                File file = new File(parameters.get("chemin") + fileName1);
+                                fileOutputStream = new FileOutputStream(file);
+//                            writer = Files.newBufferedWriter(e, StandardCharsets.ISO_8859_1);
+                                defineFileToSave1 = 1;
+                                String ActualDate = "";
+                                ActualDate = getDateAtTheGoodformat1(fic1.getDate());
+                                lineFile = parameters.get("idetab") + parameters.get("delimiteur")
+                                        + parameters.get("codePays") + parameters.get("delimiteur")
+                                        + parameters.get("status") + parameters.get("delimiteur") + ActualDate
+                                        + parameters.get("delimiteur") + fic1.getCodeFichier().get(i1).getCode();
+                                //                            writer.write(lineFile);
+                                fileOutputStream.write(lineFile.getBytes(StandardCharsets.UTF_8));
+                                fileOutputStream.write(10);
+                                //                            writer.newLine();
+                                lineFile = "";
+                            }
+                            codeFichier = fic1.getCodeFichier().get(i1).getCode();
+                            int t = Integer.parseInt(typefile.get("size"));
+                            lineFile = "";
+                            for (int p = 1; p <= t; p++) {
+                                lineFile += ((datao.getString(p) == null ? "" : datao.getString(p).trim())) + (p == t ? "" : ";");
+                            }
+                            fileOutputStream.write(lineFile.getBytes(StandardCharsets.UTF_8));
+                            fileOutputStream.write(10);
+//                        try {
+//                            writer.write(lineFile);
+//                        } catch (IOException ex) {
+//                            Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
+//                        }
+//                        try {
+//                            writer.newLine();
+//                        } catch (IOException ex) {
+//                            Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
+//                        }
+                            if (j % 10000 == 0) {
+                                System.out.println("the is no change " + j);
+                                fileOutputStream.flush();
+                            }
+//                            Double s = Math.ceil(reportDatasGenerated3.size() / 100.0);
+//                            liveReportingServices.detailsReportingToTheVue2(fic.getCodeUnique(), fic.getCodeFichier().get(i).getCode(), s.longValue());
+                            if (j % Friqunce == 0) {
+                                liveReportingServices.detailsReportingToTheVue3(fic1.getCodeUnique(), fic1.getCodeFichier().get(i1).getCode(), new Long(Friqunce));
+                            }
+                            CONST = 0;
+                            lineFile = "";
+                        }
+                        defineFileToSave1 = 0;
+                        fileOutputStream.close();
+                        statut = Long.valueOf(1);
+                        liveReportingServices.endDetailsReportingToTheVue2(fic1.getCodeUnique(), fic1.getCodeFichier().get(i1).getCode(), 1L, new Long(countQuery), new Long(countQuery));
+                        nombreOpeTraite++;
+                        quotien = Long.valueOf(1);
+                        count1 = Long.valueOf(0);
+                    } catch (IOException ex) {
+                        Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
+                    } catch (ParseException ex) {
+                        Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
+                    } catch (SQLException ex) {
+                        Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
+                    }
+                } else {
+                    liveReportingServicef.beginDetailsReportingToTheVue2(idOpe, fic1.getCodeFichier().get(i1).getCode(), 1L);
+                    Path e = null;//
+                    try {
+                        try {
+                            e = Files.createFile(Paths.get(parameters.get("chemin") + fileName1));
+                        } catch (FileAlreadyExistsException ey) {
+                            e = Paths.get(parameters.get("chemin") + fileName1);
+                        }
+                        writer = Files.newBufferedWriter(e, StandardCharsets.ISO_8859_1);
+                        defineFileToSave1 = 0;
+                        String ActualDate = "";
+                        ActualDate = getDateAtTheGoodformat1(fic1.getDate());
+                        lineFile = parameters.get("idetab") + parameters.get("delimiteur")
+                                + parameters.get("codePays") + parameters.get("delimiteur")
+                                + parameters.get("status") + parameters.get("delimiteur") + ActualDate
+                                + parameters.get("delimiteur") + fic1.getCodeFichier().get(i1).getCode();
+                        writer.write(lineFile);
+                        writer.close();
+                        liveReportingServices.endDetailsReportingToTheVue2(fic1.getCodeUnique(), fic1.getCodeFichier().get(i1).getCode(), 1L, 1L, 1L);
+                    } catch (Exception ex) {
+                        Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
+                    }
+                }
+            } catch (SQLException ex) {
+                Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
+            } catch (ClassNotFoundException ex) {
+                Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
             }
             return fileName;
         }
@@ -1638,14 +1898,182 @@ public class GenererFichierServiceImpl implements GenererFichierServices {
                     int j = 0;
                     for (ReportFile o : report) {
                         //x = t, y = 
-                        Cell cell = sheet
-                                .getRow(o.getY().intValue() - 1)
-                                .getCell(o.getX().intValue() - 1);
-                        cell.setCellValue(o.getGen());
+                        if (o.getGen() != null) {
+                            Cell cell = sheet
+                                    .getRow(o.getY().intValue() - 1)
+                                    .getCell(o.getX().intValue() - 1);
+                            cell.setCellValue(Integer.parseInt(o.getGen().equalsIgnoreCase("999999999999999") ? "0" : o.getGen()));
+                        }
                         if (j++ % Friqunce == 0) {
                             liveReportingServices.detailsReportingToTheVue3(fic1.getCodeUnique(), fic1.getCodeFichier().get(i1).getCode(), new Long(Friqunce));
                         }
                     }
+                    HSSFFormulaEvaluator.evaluateAllFormulaCells(workbookF);
+                    liveReportingServices.endDetailsReportingToTheVue2(fic1.getCodeUnique(), fic1.getCodeFichier().get(i1).getCode(), 1L, new Long(report.size()), new Long(report.size()));
+
+                    FileOutputStream fileO = new FileOutputStream(file1);
+                    workbookF.write(fileO);
+                    fileO.close();
+
+                } catch (FileNotFoundException ex) {
+                    Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
+                } catch (IOException ex) {
+                    Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
+                } catch (EncryptedDocumentException ex) {
+                    Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            }
+        }
+
+        private void duplicatePostFileSesame(GenererFichierForm fic1, int i1, int CONST1, int defineFileToSave1, String fileName1, Map<String, String> typefile, Map<String, String> dropdown1, Long count1, String file1) throws NumberFormatException {
+            BufferedWriter writer = null;
+            List<ReportFile> report = reportFileRepository.preparedFichSesame(fic1.getCodeFichier().get(i1).getCode(), fic1.getDate());
+            int Friqunce = (int) Math.ceil(report.size() / 100.0);
+            if (report.size() > 0) {
+                liveReportingServicef.beginDetailsReportingToTheVue2(idOpe, fic1.getCodeFichier().get(i1).getCode(), new Long(report.size()));
+                FileInputStream fileI;
+                System.out.println("file heer :" + file1);
+                try {
+                    fileI = new FileInputStream(file1);
+                    Workbook workbookF = WorkbookFactory.create(fileI);
+                    Sheet sheet = workbookF.getSheetAt(0);
+                    int j = 0;
+                    for (ReportFile o : report) {
+                        System.out.println(o.getY() + " : " + o.getX() + " : " + o.getGen());
+                        Cell cell = sheet
+                                .getRow(o.getY().intValue() - 1)
+                                .getCell(o.getX().intValue() - 1);
+                        cell.setCellValue(o.getGen() == null ? "" : o.getGen());
+                        if (j++ % Friqunce == 0) {
+                            liveReportingServices.detailsReportingToTheVue3(fic1.getCodeUnique(), fic1.getCodeFichier().get(i1).getCode(), new Long(Friqunce));
+                        }
+                    }
+                    HSSFFormulaEvaluator.evaluateAllFormulaCells(workbookF);
+                    liveReportingServices.endDetailsReportingToTheVue2(fic1.getCodeUnique(), fic1.getCodeFichier().get(i1).getCode(), 1L, new Long(report.size()), new Long(report.size()));
+
+                    FileOutputStream fileO = new FileOutputStream(file1);
+                    workbookF.write(fileO);
+                    fileO.close();
+
+                } catch (FileNotFoundException ex) {
+                    Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
+                } catch (IOException ex) {
+                    Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
+                } catch (EncryptedDocumentException ex) {
+                    Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            }
+        }
+
+        private void sqlSesame(GenererFichierForm fic1, int i1, int defineFileToSave1, String fileName1, Map<String, String> typefile, Long count1, String file1) throws NumberFormatException {
+            BufferedWriter writer = null;
+            List<SqlFileType> report = sqlFileTypeRepository.findSqlFileTypeByDarAndFichi(fic1.getDate(), fic1.getCodeFichier().get(i1).getCode());
+            int Friqunce = (int) Math.ceil(report.size() / 100.0);
+            if (report.size() > 0) {
+                liveReportingServicef.beginDetailsReportingToTheVue2(idOpe, fic1.getCodeFichier().get(i1).getCode(), new Long(report.size()));
+                FileInputStream fileI;
+                System.out.println("file heer :" + file1);
+                try {
+                    fileI = new FileInputStream(file1);
+                    Workbook workbookF = WorkbookFactory.create(fileI);
+                    Sheet sheet = workbookF.getSheetAt(0);
+                    int j = 0;
+                    int lineStart = 0;
+                    int colStart = 0;
+                    int ncol = 0;
+                    try {
+                        ResultSet r = connectDB().createStatement().executeQuery("select mnt1,mnt2,taux4 from sanm where lib2 = '" + fic1.getCodeFichier().get(i1).getCode() + "'");
+                        r.next();
+                        lineStart = r.getInt("mnt1");
+                        colStart = r.getInt("mnt2");
+                        ncol = r.getInt("taux4");
+                    } catch (Exception r) {
+                        lineStart = 0;
+                        colStart = 0;
+                    }
+                    int rown = lineStart - 1;
+                    for (SqlFileType o : report) {
+                        //x = t, y = 
+                        for (int y = 1; y <= ncol; y++) {
+                            try {
+                                Cell cell = sheet
+                                        .getRow(rown)
+                                        .getCell(colStart + y - 1);
+                                cell.setCellValue(o.cellExtra(y) == null ? "s" : o.cellExtra(y));
+                            } catch (Exception t) {
+                                System.out.println("return error y : " + y + "  and i:" + o.getId());
+                            }
+                        }
+                        rown++;
+                        if (j++ % Friqunce == 0) {
+                            liveReportingServices.detailsReportingToTheVue3(fic1.getCodeUnique(), fic1.getCodeFichier().get(i1).getCode(), new Long(Friqunce));
+                        }
+                    }
+                    HSSFFormulaEvaluator.evaluateAllFormulaCells(workbookF);
+                    liveReportingServices.endDetailsReportingToTheVue2(fic1.getCodeUnique(), fic1.getCodeFichier().get(i1).getCode(), 1L, new Long(report.size()), new Long(report.size()));
+
+                    FileOutputStream fileO = new FileOutputStream(file1);
+                    workbookF.write(fileO);
+                    fileO.close();
+
+                } catch (FileNotFoundException ex) {
+                    Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
+                } catch (IOException ex) {
+                    Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
+                } catch (EncryptedDocumentException ex) {
+                    Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            }
+        }
+
+        private void duplicateFileSesame(GenererFichierForm fic1, int i1, int CONST1, int defineFileToSave1, String fileName1, Map<String, String> typefile, Map<String, String> dropdown1, Long count1, String file1) throws NumberFormatException {
+            BufferedWriter writer = null;
+            List<ReportRep> report = reportRepRepository.findFichierDar(fic1.getCodeFichier().get(i1).getCode(), fic1.getDate());
+            int Friqunce = (int) Math.ceil(report.size() / 100.0);
+            if (report.size() > 0) {
+                liveReportingServicef.beginDetailsReportingToTheVue2(idOpe, fic1.getCodeFichier().get(i1).getCode(), new Long(report.size()));
+                try {
+                    FileInputStream fileI;
+                    fileI = new FileInputStream(file1);
+                    Workbook workbookF = WorkbookFactory.create(fileI);
+                    Sheet sheet = workbookF.getSheetAt(0);
+                    int j = 0;
+                    int lineStart = 0;
+                    int colStart = 0;
+                    try {
+                        ResultSet r = connectDB().createStatement().executeQuery("select mnt1,mnt2 from sanm where lib2 = '" + fic1.getCodeFichier().get(i1).getCode() + "'");
+                        r.next();
+                        lineStart = r.getInt("mnt1");
+                        colStart = r.getInt("mnt2");
+                    } catch (Exception r) {
+                        lineStart = 0;
+                        colStart = 0;
+                    }
+                    int lineincr = lineStart;
+                    int r = 0;//Integer.parseInt(dropdown1.get(report.get(j).getFichier())) - 1;
+
+                    for (ReportRep o : report) {
+                        //x = t, y = 
+                        //verif
+                        if (r > Integer.parseInt(o.getCol())) {
+                            lineincr++;
+                            r = 0;
+                        }
+                        //then take r
+                        r = Integer.parseInt(o.getCol());
+                        Cell cell = sheet
+                                .getRow(lineincr - 1)
+                                .getCell(colStart + Integer.parseInt(o.getCol()) - 1);
+                        try {
+                            cell.setCellValue(o.getValc() == null ? "" : o.getValc());
+                        } catch (Exception re) {
+                            System.out.println("valc : " + o.getValc() + " ,line :" + lineincr + " ,column :" + (colStart + Integer.parseInt(o.getCol())));
+                        }
+                        if (j++ % Friqunce == 0) {
+                            liveReportingServices.detailsReportingToTheVue3(fic1.getCodeUnique(), fic1.getCodeFichier().get(i1).getCode(), new Long(Friqunce));
+                        }
+                    }
+                    HSSFFormulaEvaluator.evaluateAllFormulaCells(workbookF);
                     liveReportingServices.endDetailsReportingToTheVue2(fic1.getCodeUnique(), fic1.getCodeFichier().get(i1).getCode(), 1L, new Long(report.size()), new Long(report.size()));
 
                     FileOutputStream fileO = new FileOutputStream(file1);
@@ -1664,430 +2092,6 @@ public class GenererFichierServiceImpl implements GenererFichierServices {
 
     }
 
-//
-//    public String genererFichiersPv1(GenererFichierForm fic) {
-//
-//        // recuperation des données a ecrire sur le fichier
-//        lineFile = "";
-//        lineFile1 = "";
-//        delimiteur = "";
-//        try {
-//            // recuperation des paramètres
-//            parameters = getGenerationAndSavingParam();
-//            delimiteur = parameters.get("delimiteur");
-//            idOpe = liveReportingService.beginGobalReportingToTheVue(fic.getCodeUnique(), fic.getCetab(), fic.getUsid(),
-//                    fic.getOperation(), Long.valueOf(fic.getCodeFichier().size()));
-//            minimum = Long.valueOf(parameters.get("minimumNumber"));
-//        } catch (SQLException ex) {
-//            Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
-//        } catch (ClassNotFoundException ex) {
-//            Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
-//        } catch (JSONException ex) {
-//            Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
-//        }
-//        System.out.println("GET DATAS FROM DATABASE*****************");
-//        try {
-//            dropdown = getFileLengthColumn();
-//        } catch (SQLException ex) {
-//            Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
-//        } catch (ClassNotFoundException ex) {
-//            Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
-//        } catch (JSONException ex) {
-//            Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
-//        }
-//
-//        // get file type
-//        try {
-//            reportCalculateService.connec();
-//        } catch (ClassNotFoundException e1) {
-//            // TODO Auto-generated catch block
-//            e1.printStackTrace();
-//        } catch (SQLException e1) {
-//            // TODO Auto-generated catch block
-//            e1.printStackTrace();
-//        } catch (JSONException e1) {
-//            // TODO Auto-generated catch block
-//            e1.printStackTrace();
-//        }
-//        // acces au fichier pour ecriture
-//        BufferedWriter writer = null;
-//        JSch jsch2 = new JSch();
-//        try {
-//            session = jsch2.getSession(parameters.get("user"), parameters.get("ip"),
-//                    Integer.parseInt(parameters.get("port")));
-//        } catch (JSchException ex) {
-//            Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
-//        }
-//        session.setPassword(parameters.get("pass"));
-//        java.util.Properties config = new java.util.Properties();
-//        config.put("StrictHostKeyChecking", "no");
-//        session.setConfig(config);
-//        System.out.println("Config set");
-//        try {
-//            session.connect();
-//        } catch (JSchException ex) {
-//            Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
-//        }
-//        System.out.println("Session connected");
-//        try {
-//            channel = session.openChannel("sftp");
-//        } catch (JSchException ex) {
-//            Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
-//        }
-//        try {
-//            channel.connect();
-//        } catch (JSchException ex) {
-//            Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
-//        }
-//        System.out.println("Connection Opened\n");
-//        channelSftp = (ChannelSftp) channel;
-//        try {
-//            System.out.println("Connection Opened\n" + parameters.get("chemin"));
-//
-//            channelSftp.cd(parameters.get("chemin"));
-//        } catch (SftpException ex) {
-//            Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
-//        }
-//
-//        for (int i = 0; i < fic.getCodeFichier().size(); i++) {
-//            Map<String, String> typefile = new HashMap<String, String>();
-//            try {
-//                typefile = reportCalculateService.getType12(fic.getCodeFichier().get(i).getCode());
-//            } catch (ClassNotFoundException e) {
-//                // TODO Auto-generated catch block
-//                e.printStackTrace();
-//            } catch (JSONException e) {
-//                // TODO Auto-generated catch block
-//                e.printStackTrace();
-//            } catch (SQLException e) {
-//                // TODO Auto-generated catch block
-//                e.printStackTrace();
-//            }
-//            if (typefile.get("result").equals("calculate") || typefile.get("result").equals("duplicateNoPost")
-//                    || typefile.get("result").equals("duplicate")) {
-//                System.out.println("GET DATA FILE FROM THE DATABASE");
-//                System.out.println("iNSIDE FIRST date value" + fic.getDate());
-//                reportDatasGenerated2 = reportDatasGeneratedRepository
-//                        .findReportDatasGeneratedByDarOrderByFichierAscRangAscColAsc(fic.getDate(),
-//                                fic.getCodeFichier().get(i).getCode(), 1);
-//                System.out.println("iNSIDE FIRST reportDatasGenerated2.size()" + reportDatasGenerated2.size());
-//                if (reportDatasGenerated2.size() > 0) {
-//                    CONST = 0;
-//                    try {
-//                        for (int j = 0; j < reportDatasGenerated2.size(); j++) {
-//                            System.out.println("UNSIDE SECOND FOREACH");
-//                            System.out.println("UNSIDE SECOND FOREACH code " + fic.getCodeFichier().get(i).getCode());
-//                            System.out.println(
-//                                    "UNSIDE SECOND reportDatasGenerated2 " + reportDatasGenerated2.get(j).getFichier());
-//                            // if(fic.getCodeFichier().get(i).getCode().equalsIgnoreCase(reportDatasGenerated2.get(j).getFichier())){
-//                            System.out.println("READYY TO WRITE");
-//                            // preparation du fichier
-//                            if (defineFileToSave == 0) {
-//                                try {
-//                                    System.out.println("FILE NAME " + getYearMonth2(fic.getDate())
-//                                            + reportDatasGenerated2.get(j).getFichier() + parameters.get("idetab") + "."
-//                                            + parameters.get("extention"));
-//                                    // structure du nom de fichier yyyyMM+typede
-//                                    // fichier(5positions)+idetab(5positions)+extension(TXT)
-//                                    fileName = getYearMonth2(fic.getDate()) + reportDatasGenerated2.get(j).getFichier()
-//                                            + parameters.get("idetab") + "." + parameters.get("extention");
-//                                } catch (ParseException ex) {
-//                                    Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null,
-//                                            ex);
-//                                }
-//                                OutputStream out = null;
-//                                try {
-//                                    out = channelSftp.put(parameters.get("chemin") + fileName);
-//                                } catch (SftpException ex) {
-//                                    Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null,
-//                                            ex);
-//                                }
-//                                writer = new BufferedWriter(new OutputStreamWriter(out));
-//                                defineFileToSave = 1;
-//                                idTrait = liveReportingService.beginDetailsReportingToTheVue(idOpe,
-//                                        fic.getCodeFichier().get(i).getCode(), Long.valueOf(nombreTotal / nbreLigne));
-//                                String ActualDate = "";
-//                                ActualDate = getDateAtTheGoodformat1(fic.getDate());
-//                                lineFile1 = parameters.get("idetab") + parameters.get("delimiteur")
-//                                        + parameters.get("codePays") + parameters.get("delimiteur")
-//                                        + parameters.get("status") + parameters.get("delimiteur") + ActualDate
-//                                        + parameters.get("delimiteur") + reportDatasGenerated2.get(j).getFichier();
-//                                writer.write(lineFile1);
-//                                writer.newLine();
-//                                lineFile1 = "";
-//                            }
-//                            codeFichier = fic.getCodeFichier().get(i).getCode();
-//
-//                            // contruction de la ligne
-//                            if (CONST < Integer.parseInt(dropdown.get(reportDatasGenerated2.get(j).getFichier())) - 1) {
-//
-//                                if (reportDatasGenerated2.get(j).getValc() != null) {
-//                                    if (reportDatasGenerated2.get(j).getValc()
-//                                            .equalsIgnoreCase("9.99999999999999E14")) {
-//
-//                                        lineFile += ";";
-//
-//                                    } else {
-//                                        lineFile += reportDatasGenerated2.get(j).getValc() + ";";
-//
-//                                    }
-//                                } else if (reportDatasGenerated2.get(j).getValm() != null) {
-//
-//                                    if (String.valueOf(reportDatasGenerated2.get(j).getValm())
-//                                            .equalsIgnoreCase("9.99999999999999E14")) {
-//
-//                                        lineFile += ";";
-//
-//                                    } else {
-//                                        lineFile += Math.abs((int) Math.round(reportDatasGenerated2.get(j).getValm())) + ";";
-//
-//                                    }
-//
-//                                } else if (reportDatasGenerated2.get(j).getVald() != null) {
-//
-//                                    if (String.valueOf(reportDatasGenerated2.get(j).getVald())
-//                                            .equalsIgnoreCase("9.99999999999999E14")) {
-//
-//                                        lineFile += ";";
-//
-//                                    } else {
-//                                        lineFile += reportDatasGenerated2.get(j).getVald() + ";";
-//
-//                                    }
-//
-//                                } else if (reportDatasGenerated2.get(j).getValt() != null) {
-//
-//                                    if (String.valueOf(reportDatasGenerated2.get(j).getValt())
-//                                            .equalsIgnoreCase("9.99999999999999E14")) {
-//
-//                                        lineFile += ";";
-//
-//                                    } else {
-//                                        lineFile += reportDatasGenerated2.get(j).getValt() + ";";
-//
-//                                    }
-//
-//                                } else {
-//
-//                                    System.out.println("TYPE ERROR .........");
-//
-//                                }
-//
-//                                CONST++;
-//
-//                            } else {
-//
-//                                if (reportDatasGenerated2.get(j).getValc() != null) {
-//
-//                                    if (reportDatasGenerated2.get(j).getValc()
-//                                            .equalsIgnoreCase("9.99999999999999E14")) {
-//
-//                                        lineFile += "";
-//
-//                                    } else {
-//                                        lineFile += reportDatasGenerated2.get(j).getValc();
-//
-//                                    }
-//
-//                                } else if (reportDatasGenerated2.get(j).getValm() != null) {
-//
-//                                    if (String.valueOf(reportDatasGenerated2.get(j).getValm())
-//                                            .equalsIgnoreCase("9.99999999999999E14")) {
-//
-//                                        lineFile += "";
-//
-//                                    } else {
-////	                            	lineFile+=reportDatasGenerated2.get(j).getValm();
-//                                        lineFile += Math.abs((int) Math.round(reportDatasGenerated2.get(j).getValm()));
-//
-//                                    }
-//
-//                                } else if (reportDatasGenerated2.get(j).getVald() != null) {
-//
-//                                    if (String.valueOf(reportDatasGenerated2.get(j).getVald())
-//                                            .equalsIgnoreCase("9.99999999999999E14")) {
-//
-//                                        lineFile += "";
-//
-//                                    } else {
-//                                        lineFile += reportDatasGenerated2.get(j).getVald();
-//
-//                                    }
-//
-//                                } else if (reportDatasGenerated2.get(j).getValt() != null) {
-//
-//                                    if (String.valueOf(reportDatasGenerated2.get(j).getValt())
-//                                            .equalsIgnoreCase("9.99999999999999E14")) {
-//
-//                                        lineFile += "";
-//
-//                                    } else {
-//                                        lineFile += reportDatasGenerated2.get(j).getValt();
-//
-//                                    }
-//
-//                                } else {
-//
-//                                    System.out.println("TYPE ERROR .........");
-//
-//                                }
-//
-//                                try {
-//                                    writer.write(lineFile);
-//                                } catch (IOException ex) {
-//                                    Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null,
-//                                            ex);
-//                                }
-//                                try {
-//                                    writer.newLine();
-//                                } catch (IOException ex) {
-//                                    Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null,
-//                                            ex);
-//                                }
-//                                System.out.println("line" + j + "= :" + lineFile);
-//                                System.out.println("end of line" + j);
-//                                count++;
-//                                quotien = liveReportingService.detailsReportingToTheVue(idTrait, codeFichier,
-//                                        Long.valueOf(nombreTotal / nbreLigne), Long.valueOf(count), quotien, minimum);
-//                                CONST = 0;
-//                                lineFile = "";
-//                            }
-//                        }
-//                        defineFileToSave = 0;
-//                        writer.close();
-//                        defineFileToSave = 0;
-//                        statut = Long.valueOf(1);
-//                        liveReportingService.endDetailsReportingToTheVue(idTrait, codeFichier, statut,
-//                                Long.valueOf(count));
-//                        System.out.println("AFTERENDING DETAILS" + idTrait);
-//                        nombreOpeTraite++;
-//                        quotien = Long.valueOf(1);
-//                        count = Long.valueOf(0);
-//                    } catch (IOException ex) {
-//                        Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
-//                    } catch (ParseException ex) {
-//                        Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
-//                    }
-//                } else {
-//
-//                    idTrait = liveReportingService.beginDetailsReportingToTheVue(idOpe,
-//                            fic.getCodeFichier().get(i).getCode(), Long.valueOf(0));
-//                    liveReportingService.endDetailsReportingToTheVue(idTrait, fic.getCodeFichier().get(i).getCode(),
-//                            Long.valueOf(1), Long.valueOf(0));
-//
-//                }
-//            } else if (typefile.get("result").equals("sql")) {
-//                System.out.println("GET DATA FILE FROM THE DATABASE");
-//                System.out.println("iNSIDE FIRST date value" + fic.getDate());
-//                reportDatasGenerated3 = sqlFileTypeRepository.findSqlFileTypeByDarAndFichi(fic.getDate(),
-//                        fic.getCodeFichier().get(i).getCode());
-//                System.out.println("iNSIDE FIRST reportDatasGenerated3.size()" + reportDatasGenerated3.size());
-//                if (reportDatasGenerated3.size() > 0) {
-//                    CONST = 0;
-//                    try {
-//                        for (int j = 0; j < reportDatasGenerated3.size(); j++) {
-//                            System.out.println("UNSIDE SECOND FOREACH");
-//                            System.out.println("UNSIDE SECOND FOREACH code " + fic.getCodeFichier().get(i).getCode());
-//                            System.out.println(
-//                                    "UNSIDE SECOND reportDatasGenerated3 " + reportDatasGenerated3.get(j).getFichi());
-//                            // if(fic.getCodeFichier().get(i).getCode().equalsIgnoreCase(reportDatasGenerated2.get(j).getFichier())){
-//                            System.out.println("READYY TO WRITE");
-//                            // preparation du fichier
-//                            if (defineFileToSave == 0) {
-//                                try {
-//                                    System.out.println("FILE NAME " + getYearMonth2(fic.getDate())
-//                                            + reportDatasGenerated3.get(j).getFichi() + parameters.get("idetab") + "."
-//                                            + parameters.get("extention"));
-//                                    // structure du nom de fichier yyyyMM+typede
-//                                    // fichier(5positions)+idetab(5positions)+extension(TXT)
-//                                    fileName = getYearMonth2(fic.getDate()) + reportDatasGenerated3.get(j).getFichi()
-//                                            + parameters.get("idetab") + "." + parameters.get("extention");
-//                                } catch (ParseException ex) {
-//                                    Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null,
-//                                            ex);
-//                                }
-//                                OutputStream out = null;
-//                                try {
-//                                    out = channelSftp.put(parameters.get("chemin") + fileName);
-//                                } catch (SftpException ex) {
-//                                    Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null,
-//                                            ex);
-//                                }
-//                                writer = new BufferedWriter(new OutputStreamWriter(out));
-//                                defineFileToSave = 1;
-//                                idTrait = liveReportingService.beginDetailsReportingToTheVue(idOpe,
-//                                        fic.getCodeFichier().get(i).getCode(), Long.valueOf(nombreTotal / nbreLigne));
-//                                String ActualDate = "";
-//                                ActualDate = getDateAtTheGoodformat1(fic.getDate());
-//                                lineFile1 = parameters.get("idetab") + parameters.get("delimiteur")
-//                                        + parameters.get("codePays") + parameters.get("delimiteur")
-//                                        + parameters.get("status") + parameters.get("delimiteur") + ActualDate
-//                                        + parameters.get("delimiteur") + reportDatasGenerated3.get(j).getFichi();
-//                                writer.write(lineFile1);
-//                                writer.newLine();
-//                                lineFile1 = "";
-//                            }
-//                            codeFichier = fic.getCodeFichier().get(i).getCode();
-//
-//                            // contruction de la ligne
-//                            int t = Integer.parseInt(typefile.get("size"));
-//                            System.out.println("the lenth is:" + t);
-//                            lineFile = "";
-//                            for (int p = 1; p <= t; p++) {
-//                                lineFile += reportDatasGenerated3.get(j).cellExtra(p) + (p == t ? "" : ";");
-//                            }
-//                            System.out.println(lineFile);
-//                            try {
-//                                writer.write(lineFile);
-//                            } catch (IOException ex) {
-//                                Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
-//                            }
-//                            try {
-//                                writer.newLine();
-//                            } catch (IOException ex) {
-//                                Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
-//                            }
-//                            System.out.println("line" + j + "= :" + lineFile);
-//                            System.out.println("end of line" + j);
-//                            count++;
-//                            quotien = liveReportingService.detailsReportingToTheVue(idTrait, codeFichier,
-//                                    Long.valueOf(nombreTotal / nbreLigne), Long.valueOf(count), quotien, minimum);
-//                            CONST = 0;
-//                            lineFile = "";
-//                        }
-//                        defineFileToSave = 0;
-//                        writer.close();
-//                        defineFileToSave = 0;
-//                        statut = Long.valueOf(1);
-//                        liveReportingService.endDetailsReportingToTheVue(idTrait, codeFichier, statut,
-//                                Long.valueOf(count));
-//                        System.out.println("AFTERENDING DETAILS" + idTrait);
-//                        nombreOpeTraite++;
-//                        quotien = Long.valueOf(1);
-//                        count = Long.valueOf(0);
-//                    } catch (IOException ex) {
-//                        Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
-//                    } catch (ParseException ex) {
-//                        Logger.getLogger(GenererFichierServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
-//                    }
-//                } else {
-//
-//                    idTrait = liveReportingService.beginDetailsReportingToTheVue(idOpe,
-//                            fic.getCodeFichier().get(i).getCode(), Long.valueOf(0));
-//                    liveReportingService.endDetailsReportingToTheVue(idTrait, fic.getCodeFichier().get(i).getCode(),
-//                            Long.valueOf(1), Long.valueOf(0));
-//
-//                }
-//            }
-//
-//        }
-//        statutope = Long.valueOf(1);
-//        liveReportingService.endGobalReportingToTheVue(idOpe, statutope, nombreOpeTraite);
-//        nombreOpeTraite = Long.valueOf(0);
-//        System.out.println("end of process-----------");//
-//        return "1";
-//
-//    }
     public static String randoms() {
 
         Date date = new Date();

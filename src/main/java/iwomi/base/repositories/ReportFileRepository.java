@@ -28,7 +28,7 @@ public interface ReportFileRepository extends JpaRepository<ReportFile, Long> {
             + "a.ETAB ETAB,\n"
             + "a.FEUI FEUI,\n"
             + "a.FICH FICH,\n"
-            + "b.valm GEN,\n"
+            + "abs(b.valm) GEN,\n"
             + "a.MDFI MDFI,\n"
             + "a.MUSER MUSER,\n"
             + "a.POSTE POSTE,\n"
@@ -36,8 +36,27 @@ public interface ReportFileRepository extends JpaRepository<ReportFile, Long> {
             + "a.SOURCE SOURCE,\n"
             + "a.TFIC TFIC,\n"
             + "a.T T,\n"
-            + "a.Y Y from (select * from rppfich where fich = ?1 and t is not null)a inner join (select * from rprep where dar = to_date(?2,'yyyy-mm-dd') and fichier = ?1)b on a.col = b.col and a.poste = b.post and a.fich = b.fichier", nativeQuery = true)
+            + "a.Y Y from (select * from rppfich where fich = ?1 and t is not null)a LEFT join (select * from rprep where dar = to_date(?2,'yyyy-mm-dd') and fichier = ?1)b on a.col = b.col and a.poste = b.post and a.fich = b.fichier", nativeQuery = true)
     List<ReportFile> preparedResultSesame(String fich, String d);
+    
+    
+    @Query(value = "select a.ID ID,\n"
+            + "a.COL COL,\n"
+            + "a.CRDT CRDT,\n"
+            + "a.CUSER CUSER,\n"
+            + "a.ETAB ETAB,\n"
+            + "a.FEUI FEUI,\n"
+            + "a.FICH FICH,\n"
+            + " b.valc GEN,\n"
+            + "a.MDFI MDFI,\n"
+            + "a.MUSER MUSER,\n"
+            + "a.POSTE POSTE,\n"
+            + "a.RANG RANG,\n"
+            + "a.SOURCE SOURCE,\n"
+            + "a.TFIC TFIC,\n"
+            + "a.T T,\n"
+            + "a.Y Y from (select * from rppfich where fich = ?1 and t is not null)a LEFT join (select * from rprep where dar = to_date(?2,'yyyy-mm-dd') and fichier = ?1)b on a.col = b.col and a.poste = b.post and a.fich = b.fichier", nativeQuery = true)
+    List<ReportFile> preparedFichSesame(String fich, String d);
     
     @Query(value = "SELECT * FROM rppfich e WHERE e.fich = ?1 AND rownum<=?3 and rownum>=?	2  ORDER BY e.rang Asc, e.col Asc  ", nativeQuery = true)
     List<ReportFile> findReportFileByFichOR(String fich, int lowLimt, int upLimt);

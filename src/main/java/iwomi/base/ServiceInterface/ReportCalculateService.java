@@ -33,7 +33,10 @@ public interface ReportCalculateService {
 
     Map<String, String> getGenerationAndSavingParam() throws SQLException, ClassNotFoundException, JSONException;
 
+    String insertPeriodsValiables(String e, Statement r) throws SQLException, ClassNotFoundException, JSONException;
+
     Statement conac();
+
     Statement conac1();
 
     Model get_cells(ReportRep s);
@@ -49,6 +52,7 @@ public interface ReportCalculateService {
     Map<String, String> getType1(String fich) throws SQLException, ClassNotFoundException, JSONException;
 
     void connec() throws SQLException, ClassNotFoundException, JSONException;
+
     void connec1() throws SQLException, ClassNotFoundException, JSONException;
 
     Map<String, String> getType11(String fich) throws SQLException, ClassNotFoundException, JSONException;
@@ -57,6 +61,7 @@ public interface ReportCalculateService {
 
     String getmin() throws SQLException, ClassNotFoundException, JSONException;
 //		double eval(String formule);
+
     List<ReportControleIntra> QUERYSET(Statement s) throws SQLException, ClassNotFoundException, JSONException;
 
     Map<String, Map<String, String>> getType13() throws SQLException, ClassNotFoundException, JSONException;

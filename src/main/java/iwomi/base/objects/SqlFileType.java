@@ -543,7 +543,6 @@ public class SqlFileType {
     }
 
     public Boolean setByColumn1(SqlFileType d) {
-
         if (d.col1 != null) {
             this.col1 = d.col1;
         }
