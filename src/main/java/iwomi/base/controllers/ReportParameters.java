@@ -595,7 +595,7 @@ public class ReportParameters {
             List<ReportRep2> s = reportRepRepository2.findByRang(id);
             System.out.println("the syste is " + s.size());
             s.forEach(e -> {
-                System.out.println("its delating " + e.getValc());
+                System.out.println("its delating 1" + e.getValc());
                 reportRepRepository2.delete(new ReportRepId(e.getRang(), e.getDar(), e.getCol(), e.getFichier()));
             });
             return true;
@@ -787,7 +787,7 @@ public class ReportParameters {
         List<ReportRep> s = reportRepRepository.findByRangAndFichier(Long.parseLong(ld.get("rang")), ld.get("fichier"));
         System.out.println("the syste is " + s.size());
         s.forEach(e -> {
-            System.out.println("its delating " + e.getValc());
+            System.out.println("its delating 4" + e.getValc());
             reportRepRepository.delete(e.getId());
 //				reportRepRepository2.delete(new ReportRepIdS(e.getRang(), e.getDar(), e.getCol(), e.getFichier()));
         });
@@ -830,7 +830,7 @@ public class ReportParameters {
     @GetMapping(path = "/getPost")
     public List<Nomenclature> getPost() {
         List<Nomenclature> e = nomenclatureRepository.findBytabcdAndDelequery(tabcd, 0);
-        System.out.println("its delating " + e.size());
+//        System.out.println("its delating " + e.size());
         return e;
     }
 

@@ -215,25 +215,19 @@ public class ManageExcelFiles extends GlobalService {
                     rowNumber++;
                     continue;
                 }
-                System.out.println("verify the date r :" + colnum);
                 Iterator<Cell> cellsInRow = currentRow.iterator();
-                System.out.println("verify the date 2:" + rowNumber);
                 String post = "";
                 for (int cellIdx = 0; cellIdx < colnum; cellIdx++) {
-                    System.out.println("verify the date 2:" + cellIdx);
 
-                    Cell currentCell = null;
                     ReportRep reportRep = new ReportRep();
-                    try {
-                        currentCell = cellsInRow.next();
-                        reportRep.setValc(s.formatCellValue(currentCell));
-                    } catch (Exception e) {
+                    System.out.println("data : " + currentRow.getCell(cellIdx));
+                    if (currentRow.getCell(cellIdx) == null) {
                         reportRep.setValc("");
-                        System.out.println("the value at " + e.getMessage() + ":" + currentCell);
-                        break;
+                    } else {
+                        reportRep.setValc(s.formatCellValue(currentRow.getCell(cellIdx)));
                     }
                     if (cellIdx == 0 && hh.get("result").equalsIgnoreCase("duplicateNoPost")) {
-                        post = s.formatCellValue(currentCell);
+                        post = s.formatCellValue(currentRow.getCell(cellIdx));
                         System.out.println("the post is :" + post);
                         continue;
                     }
