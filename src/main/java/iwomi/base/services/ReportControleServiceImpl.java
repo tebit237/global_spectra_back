@@ -135,8 +135,10 @@ public class ReportControleServiceImpl extends GlobalService implements ReportCo
 //inter correction
 
     public void autoCorrectInterControl(String date, String etab) {
+
+//        System.out.println("the number of data to verify :" + date);
         List<ReportAnomaly> r = reportAnomalyRepository.findByinterCont(date, "inter");
-        System.out.println("the number of data to verify :" + r.size());
+//        System.out.println("the number of data to verify :" + r.size());
         Map<String, Map<String, String>> yy = null;
         List<String> uy = new ArrayList<>();
         try {
@@ -150,59 +152,58 @@ public class ReportControleServiceImpl extends GlobalService implements ReportCo
             if (y.getCtrid() == null) {
                 continue;
             }
-            ReportControleIntra g = reportControleIntraRepository.findById(y.getCtrid());
-            Integer oo = null;
+            ReportControleIntra g = reportControleIntraRepository.findById(y.getCtrid());//getting the control of the anomally
+            BigDecimal oo = null;
             try {
-                oo = getResultIntrav1(g.getCd(), date, etab).subtract(getResultIntrav1(g.getCg(), date, etab)).intValue();
+                oo = getResultIntrav1(g.getCd(), date, etab).subtract(getResultIntrav1(g.getCg(), date, etab));
             } catch (Exception ex) {
 //                System.out.println("Error : "+g.getCd() + " : " + g.getCg());
-                oo = 99;
+                oo = new BigDecimal(99);
                 Logger.getLogger(ReportControleServiceImpl.class.getName()).log(Level.SEVERE, null, ex);
             }
             System.out.println("the real difference is :" + oo);
             String ji = null;
-            oo = oo < 0 ? -oo : oo;
 
-            if (oo <= 2) {
+//            oo = oo < 0 ? -oo : oo;
+            if (oo.abs().intValue() <= 2) {
                 //get which of the file to act on
                 // left
                 List<String> e = new ArrayList<>();
                 List<String> uy1 = new ArrayList<>();
                 for (String o : y.getCd().split("[+/*-]")) {
                     uy1.add(o.trim().replaceAll("\\s+", ""));
-                    e.add(o.trim().split("\\:")[0].trim());
-                    ji = o.trim().split("\\:")[1].trim();
+                    e.add(o.trim().split("\\:")[0].trim());//file
+                    ji = o.trim().split("\\:")[1].trim();//post with colon
                 }
                 for (String u : y.getCg().split("[+/*-]")) {
                     uy1.add(u.trim().replaceAll("\\s+", ""));
-                    e.add(u.trim().split("\\:")[0].trim());
-                    ji = u.trim().split("\\:")[1].trim();
+                    e.add(u.trim().split("\\:")[0].trim());//file
+                    ji = u.trim().split("\\:")[1].trim();//post with colon
                 }
                 if (checkAlreadyModifiedField(e, ji.substring(2, ji.lastIndexOf("C")), uy)) {
                     continue;
                 }
                 int j = 0;
-                String fi = "";
-                for (String f : e) {
-                    int uu = 0;
-                    try {
-                        uu = Integer.parseInt(f.trim().substring(1));
-                    } catch (Exception rp) {
-                        System.out.println("the value of f :" + f);
-                        uu = 0;
-                    }
-                    if (uu >= j) {
-                        j = uu;
-                        fi = f;
-                    }
-                }
+//                1 - 2 = -1
+//                round left  1+1 = 2
+//        round right 2-1 = 1
+                String fi = chooseFileSmallestInteger(e, j);//getting what would be modified with respect to the other
                 String post = ji.substring(2, ji.lastIndexOf("C"));
+//                getting which is to be selected, left or right
+                String su = "g";
+                System.out.println("droit :" + g.getCd() + " et gouch" + g.getCg());
+                if (g.getCd().contains(fi + ":CH" + post + "C")) {
+                    su = "d";
+                }
+                if (g.getCg().contains(fi + ":CH" + post + "C")) {
+                    su = "g";
+                }
                 System.out.println("for eqn :" + y.getCg() + " " + y.getCd() + ", the file chosen is :" + fi + " and post from :" + post + "  " + date);
                 Map<String, String> yo = yy.get(fi);
                 if (yy != null && yy.containsKey(fi) && yy.get(fi) != null && yo.get("auto_correct") != null) {
                     switch (yo.get("result")) {
                         case "calculate":
-                            updateOthersAutocorrect(fi, post, yo.get("auto_correct").trim(), date, oo);
+                            updateOthersAutocorrect(fi, post, yo.get("auto_correct").trim(), date, oo, su);
                             //must be updated
                             uy.add(fi + ":" + post);
                             break;
@@ -216,7 +217,7 @@ public class ReportControleServiceImpl extends GlobalService implements ReportCo
                         case "sql":
                             SqlFileType s = sqlFileTypeRepository.findById(new Long(post));
                             String kk = s.cellExtra(Integer.parseInt(yo.get("auto_correct").trim()));
-                            Integer uuo = Integer.parseInt(kk) + oo;
+                            Integer uuo = Integer.parseInt(kk) + oo.intValue();
                             s = s.cellinsert(Integer.parseInt(yo.get("auto_correct").trim()), uuo.toString());
                             sqlFileTypeRepository.save(s);
                             uy.add(fi + ":" + "CH" + post + "C" + yo.get("auto_correct").trim());
@@ -229,10 +230,29 @@ public class ReportControleServiceImpl extends GlobalService implements ReportCo
             }
         }
     }
+// alogrithm to get the first file  F1001 is taken before F1004
+
+    private String chooseFileSmallestInteger(List<String> e, int j) {
+        String fi = "";
+        for (String f : e) {
+            int uu = 0;
+            try {
+                uu = Integer.parseInt(f.trim().substring(1));
+            } catch (Exception rp) {
+//                System.out.println("the value of f :" + f);
+                uu = 0;
+            }
+            if (uu >= j) {
+                j = uu;
+                fi = f;
+            }
+        }
+        return fi;
+    }
 
     private Boolean checkAlreadyModifiedField(List<String> listfile, String post, List<String> used) {
         for (String t : listfile) {
-            System.out.println("checking " + t + ":" + post + " in used " + used);
+//            System.out.println("checking " + t + ":" + post + " in used " + used);
             if (used.contains(t + ":" + post)) {
                 return true;
             }
@@ -240,19 +260,28 @@ public class ReportControleServiceImpl extends GlobalService implements ReportCo
         return false;
     }
 
-    private void updateOthersAutocorrect(String fi, String post, String yo, String date, Integer oo) {
-        ReportRep er = reportRepRepository.findByFichierAndPostAndColAndDar1(fi, post.trim(), yo, date);
-        if (er != null) {
-            System.out.println("field : " + er.getFeild());
-            System.out.println("old value : " + er.getValm());
-            er.setValm(er.getValm() + oo);
-            System.out.println("new value : " + er.getValm());
-            reportRepRepository.save(er);
-            for (ReportCalculate h : reportCalculateRepository.findOthers(fi, "%CH" + post.trim() + "C" + yo + "%")) {
-                updateOthersAutocorrect(h.getFichi(), h.getPost(), h.getCol(), date, oo);
-            }
+    private void updateOthersAutocorrect(String fi, String post, String yo, String date, BigDecimal oo, String j) {
+        try {
+            Integer.parseInt(yo);
+            ReportRep er = reportRepRepository.findByFichierAndPostAndColAndDar1(fi, post.trim(), yo, date);
+            if (er != null) {
+                Integer y = 0;
+                if (j == "d") {
+                    System.out.println("changing " + fi + ":CH" + post + "C" + yo + " from " + er.getValm() + " to " + (er.getValm() - oo.doubleValue()));
+                    er.setValm(er.getValm() - oo.doubleValue());
+                } else if (j == "g") {
+                    System.out.println("changing " + fi + ":CH" + post + "C" + yo + " from " + er.getValm() + " to " + (er.getValm() + oo.doubleValue()));
+                    er.setValm(er.getValm() + oo.doubleValue());
+                }
+                for (ReportCalculate h : reportCalculateRepository.findOthers(fi, "%CH" + post.trim() + "C" + yo + "%")) {
+                    updateOthersAutocorrect(h.getFichi(), h.getPost(), h.getCol(), date, oo, j);
+                }
 
+            }
+        } catch (Exception s) {
+            System.out.println(fi + " file auto correct column is not set");
         }
+
     }
 
     public BigDecimal getResultComplex2(String arguments, String date, String etab, String cod, String type) {
@@ -1456,8 +1485,9 @@ public class ReportControleServiceImpl extends GlobalService implements ReportCo
         Map<String, Map<String, String>> yy;
         List<ReportControleInter> s2;
         ScriptEngine u;
+        String app_s;//1 sesam 2 spectra
 
-        public IntraThreadTeatment(List<ReportControleInter> s2, ScriptEngine u, String date, Long idOpe, String etab, String ssd, Map<String, Map<String, String>> yy) {
+        public IntraThreadTeatment(List<ReportControleInter> s2, ScriptEngine u, String date, Long idOpe, String etab, String ssd, Map<String, Map<String, String>> yy, String s) {
             this.controle_type = controle_type;
             this.date = date;
             this.idOpe = idOpe;
@@ -1556,7 +1586,11 @@ public class ReportControleServiceImpl extends GlobalService implements ReportCo
                 h++;
                 Boolean brk = null;
                 try {
-                    ps = yy.get(s1.getFich().trim().substring(0, 5));
+                    if (app_s.equalsIgnoreCase("2")) {
+                        ps = yy.get(s1.getFich().trim().substring(0, 5));
+                    } else {
+                        ps = yy.get(s1.getFich().trim().substring(0, 6));
+                    }
                     //object would help to detect once for queries which are non post type
                     String tt = ps.get("postlike_query");
                     fich = s1.getFich();
@@ -1832,11 +1866,11 @@ public class ReportControleServiceImpl extends GlobalService implements ReportCo
             if (loop1.size() > 0) {
                 r.add(loop1);
             }
-            TreatThreadControl(r, u, date, idOpe, etab, ssd, yy, listInter.size());
+            TreatThreadControl(r, u, date, idOpe, etab, ssd, yy, listInter.size(), s);
 
         }
 
-        private void TreatThreadControl(List<List<ReportControleInter>> r, ScriptEngine u, String date, Long idOpe, String etab, String ssd, Map<String, Map<String, String>> yy, int total) {
+        private void TreatThreadControl(List<List<ReportControleInter>> r, ScriptEngine u, String date, Long idOpe, String etab, String ssd, Map<String, Map<String, String>> yy, int total, String s) {
             ExecutorService service = Executors.newFixedThreadPool(10);
             Thread t = new Thread(new Runnable() {
                 public void run() {
@@ -1844,7 +1878,7 @@ public class ReportControleServiceImpl extends GlobalService implements ReportCo
                         try {
                             Map<String, String> type = new HashMap<>();
                             for (List<ReportControleInter> rt : r) {
-                                service.execute(new ReportControleServiceImpl.IntraThreadTeatment(rt, u, date, idOpe, etab, ssd, yy));
+                                service.execute(new ReportControleServiceImpl.IntraThreadTeatment(rt, u, date, idOpe, etab, ssd, yy, s));
                             }
                             // this will get blocked until all task finish
                             service.shutdown();
@@ -2693,7 +2727,7 @@ public class ReportControleServiceImpl extends GlobalService implements ReportCo
 //                System.out.println("query for " + r + " : " + sql);
                 List<Map<String, Object>> tmp = jdbcTemplate.queryForList(sql);
                 if (!tmp.isEmpty()) {
-                    System.out.println("passé");
+//                    System.out.println("passé");
                     for (int t = 0; t < tmp.size(); t++) {
                         val = tmp.get(t).get("valm").toString();
                         System.out.println("The value of " + r + " is :" + val);
@@ -2706,11 +2740,11 @@ public class ReportControleServiceImpl extends GlobalService implements ReportCo
                 }
             }
         }
-        System.out.println("The formule " + formule + "  = " + val);
+//        System.out.println("The formule " + formule + "  = " + val);
         if (i == 1) {
             rt = new BigDecimal(eval(frm.replaceAll("999999999999999", "0")));
         }
-        return rt.abs();
+        return rt;
     }
 
     public double eval(final String str) {
