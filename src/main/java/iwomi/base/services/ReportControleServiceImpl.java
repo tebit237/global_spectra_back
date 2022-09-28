@@ -273,6 +273,7 @@ public class ReportControleServiceImpl extends GlobalService implements ReportCo
                     System.out.println("changing " + fi + ":CH" + post + "C" + yo + " from " + er.getValm() + " to " + (er.getValm() + oo.doubleValue()));
                     er.setValm(er.getValm() + oo.doubleValue());
                 }
+                reportRepRepository.save(er);
                 for (ReportCalculate h : reportCalculateRepository.findOthers(fi, "%CH" + post.trim() + "C" + yo + "%")) {
                     updateOthersAutocorrect(h.getFichi(), h.getPost(), h.getCol(), date, oo, j);
                 }
@@ -1497,6 +1498,7 @@ public class ReportControleServiceImpl extends GlobalService implements ReportCo
             this.cuser = "000";
             this.s2 = s2;
             this.u = u;
+            this.app_s = s;
         }
 
         private List<ReportControleInter> ConvertListIntra(Map<String, String> ps, String date, ReportControleInter rii) {
@@ -1510,7 +1512,7 @@ public class ReportControleServiceImpl extends GlobalService implements ReportCo
                 }
             }
             String ww = "";
-            if (r.getFich().trim().length() > 5) { //F1001(F010-T630)
+            if (r.getFich().trim().length() > 5 && app_s.equalsIgnoreCase("2")) { //F1001(F010-T630)
                 ww = r.getFich();
                 String post1 = r.getFich().trim().substring(6, 10);
                 String post2 = r.getFich().trim().substring(11, 15);
@@ -1561,7 +1563,7 @@ public class ReportControleServiceImpl extends GlobalService implements ReportCo
                 }
 
             }
-
+            System.out.println(pp);
             return pp;
         }
 
@@ -2871,6 +2873,7 @@ public class ReportControleServiceImpl extends GlobalService implements ReportCo
 
     public List<String> separeteData1(String formule) {
         List<String> ret = new ArrayList<String>();
+        System.out.println(formule);
         formule = formule.substring(2, formule.length());
         int lasttIndex = formule.lastIndexOf('C');
         String post = formule.substring(0, lasttIndex);
