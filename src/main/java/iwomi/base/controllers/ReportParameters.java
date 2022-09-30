@@ -80,11 +80,17 @@ import iwomi.base.services.MediaTypeUtils;
 import iwomi.base.services.NomenclatureServiceImpl;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.math.BigInteger;
 import java.sql.Types;
 import java.text.DateFormat;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServletResponse;
 import org.springframework.core.io.InputStreamResource;
@@ -1364,6 +1370,35 @@ public class ReportParameters {
 //            }
 //        }
 //    }
+    public String saveZipfile(List<File> f, String zip_file_name) {
+//        List<String> srcFiles = Arrays.asList("test1.txt", "test2.txt");
+        FileOutputStream fos;
+        try {
+            fos = new FileOutputStream(zip_file_name);
+
+            ZipOutputStream zipOut = new ZipOutputStream(fos);
+            for (File fileToZip : f) {
+                FileInputStream fis = new FileInputStream(fileToZip);
+                ZipEntry zipEntry = new ZipEntry(fileToZip.getName());
+                zipOut.putNextEntry(zipEntry);
+
+                byte[] bytes = new byte[1024];
+                int length;
+                while ((length = fis.read(bytes)) >= 0) {
+                    zipOut.write(bytes, 0, length);
+                    System.out.println("writing");
+                }
+                fis.close();
+            }
+            zipOut.close();
+            fos.close();
+        } catch (FileNotFoundException ex) {
+            System.out.println("file not found");
+        } catch (IOException ex) {
+            System.out.println("excetion : " + ex.getMessage());
+        }
+        return "0";
+    }
     @Autowired
     private ServletContext servletContext;
 
@@ -1387,6 +1422,31 @@ public class ReportParameters {
                 .contentType(mediaType)
                 // Contet-Length
                 .contentLength(file.length()) //
+                .body(resource);
+    }
+
+    @PostMapping(path = "/downloadGenFile2")
+    //zipe multiple files
+    public ResponseEntity<InputStreamResource> downloadFile2(@RequestBody List<GenFile> tf) throws IOException {
+        String yy = "";
+        String file_name = "file.zip";
+        List<File> o = new ArrayList<>();
+        for (GenFile f : tf) {
+
+            o.add(new File(f.getFich() + "/" + f.getCode()));
+            yy = f.getFich() + "/" + file_name;
+        }
+        new File(yy).delete();
+        saveZipfile(o, yy);
+        File file = new File(yy);
+        MediaType mediaType = MediaTypeUtils.getMediaTypeForFileName(this.servletContext, file_name);
+        InputStreamResource resource = new InputStreamResource(new FileInputStream(file));
+        Long y = file.length();
+        String t = file.getName();
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment;filename=" + t)
+                .contentType(mediaType)
+                .contentLength(y) //
                 .body(resource);
     }
 

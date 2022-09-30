@@ -27,6 +27,8 @@ import java.sql.SQLException;
 import java.sql.SQLType;
 import java.sql.Statement;
 import java.sql.Timestamp;
+import java.text.DecimalFormat;
+import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -39,10 +41,12 @@ import java.util.logging.Logger;
 
 import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletResponse;
+import org.apache.poi.hssf.usermodel.HSSFCell;
 
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.DataFormatter;
+import org.apache.poi.ss.usermodel.DateUtil;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
@@ -211,20 +215,34 @@ public class ManageExcelFiles extends GlobalService {
             while (rows.hasNext()) {
                 Row currentRow = rows.next();
                 // skip header
-                if (rowNumber == 0) {
+                if (rowNumber == 0 ||currentRow.getCell(0)==null) {
                     rowNumber++;
                     continue;
                 }
                 Iterator<Cell> cellsInRow = currentRow.iterator();
+                System.out.println("line : " + rowNumber + " :" + currentRow.getCell(0));
                 String post = "";
                 for (int cellIdx = 0; cellIdx < colnum; cellIdx++) {
 
                     ReportRep reportRep = new ReportRep();
-                    System.out.println("data : " + currentRow.getCell(cellIdx));
+//                    System.out.println("data : " + currentRow.getCell(cellIdx).getCellType() + " : " + currentRow.getCell(cellIdx) + " : ");
                     if (currentRow.getCell(cellIdx) == null) {
                         reportRep.setValc("");
                     } else {
-                        reportRep.setValc(s.formatCellValue(currentRow.getCell(cellIdx)));
+//                        reportRep.setValc(currentRow.getCell(cellIdx).getStringCellValue());
+                        switch (currentRow.getCell(cellIdx).getCellType().toString()) {
+                            case "STRING":
+                                reportRep.setValc(currentRow.getCell(cellIdx).getStringCellValue());
+                                break;
+                            case "NUMERIC":
+                                NumberFormat nf = DecimalFormat.getInstance();
+                                nf.setMaximumFractionDigits(0);
+                                String str = nf.format(currentRow.getCell(cellIdx).getNumericCellValue());
+                                reportRep.setValc(str.replaceAll(",", ""));
+                                break;
+                            default:
+                                reportRep.setValc(currentRow.getCell(cellIdx).getStringCellValue());
+                        }
                     }
                     if (cellIdx == 0 && hh.get("result").equalsIgnoreCase("duplicateNoPost")) {
                         post = s.formatCellValue(currentRow.getCell(cellIdx));
@@ -293,7 +311,7 @@ public class ManageExcelFiles extends GlobalService {
                 System.out.println("starting row " + rowCount + " insertion");
             }
             Row row = sheet.createRow(rowCount++);
-            int columnCount = 1;
+            int columnCount = 0;
             for (int i = 0; i <= leng; i++) {
                 createCell(row, columnCount++, user.cellExtra(i + 1), style);
             }

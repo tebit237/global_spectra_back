@@ -2455,7 +2455,7 @@ public class ReportControleServiceImpl extends GlobalService implements ReportCo
     }
 
     public BigDecimal getResultInter(String formule, String fichier, String date, String etab) throws ParseException {
-        System.out.println(formule);
+//        System.out.println(formule);
         formule = " " + formule.replaceAll("\\+", " + ").replaceAll("\\-", " - ") + " ";
         String[] r = formule.split(" ");
         List<String> str = new ArrayList<String>();
@@ -2873,7 +2873,6 @@ public class ReportControleServiceImpl extends GlobalService implements ReportCo
 
     public List<String> separeteData1(String formule) {
         List<String> ret = new ArrayList<String>();
-        System.out.println(formule);
         formule = formule.substring(2, formule.length());
         int lasttIndex = formule.lastIndexOf('C');
         String post = formule.substring(0, lasttIndex);

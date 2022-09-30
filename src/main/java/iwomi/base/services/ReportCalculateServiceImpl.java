@@ -757,7 +757,6 @@ public class ReportCalculateServiceImpl extends GlobalService implements ReportC
         }
         values = value + values;
         String sql = "Select val,tab,sel from rpatt " + "where att=" + values;
-        System.out.println("Query to get Attribute : " + values);
         List<Map<String, Object>> result = jdbcTemplate.queryForList(sql);
         Map<String, Object> p = new HashMap<>();
         String cmd = "";
@@ -772,15 +771,12 @@ public class ReportCalculateServiceImpl extends GlobalService implements ReportC
                 }
                 if (result.get(j).get("TAB") != null) {
                     cmdt.add(result.get(j).get("TAB").toString().trim());
-                    System.out.println("the main table : " + cmdt);
                     if (result.get(j).get("SEL") != null && result.get(j).get("SEL") != "") {
                         selc = result.get(j).get("SEL").toString().trim();
-                        System.out.println("main suming column : " + selc);
                     }
                 }
             }
         }
-        System.out.println("the where close : " + cmd);
         p.put("cmd", cmd);
         p.put("cmdt", cmdt);
         p.put("sel", selc);
@@ -884,7 +880,7 @@ public class ReportCalculateServiceImpl extends GlobalService implements ReportC
                 List<String> ret1 = new ArrayList<String>();
                 String formule = FICPOST.get(t).get("CALC").toString();
                 Double divd = Double.parseDouble(FICPOST.get(t).get("DIVD").toString());
-                System.out.println("FormulePost: " + formule);
+//                System.out.println("FormulePost: " + formule);
                 String condition = null;
                 Map<String, Object> pr = new HashMap<>();
                 if (formule.equals("")) {
@@ -906,7 +902,7 @@ public class ReportCalculateServiceImpl extends GlobalService implements ReportC
                     p = st.get(0).toString();
                 }
                 List<Map<String, Object>> rr = postCollect(post, p);
-                System.out.println("get Chapter of post " + p + " : " + rr);
+//                System.out.println("get Chapter of post " + p + " : " + rr);
                 if (formule.isEmpty()) {
                     result = "0";
                 } else {
@@ -926,6 +922,7 @@ public class ReportCalculateServiceImpl extends GlobalService implements ReportC
                         result = "0";
                     }
                 }
+                System.out.println(formule+" : "+result);
                 globalpostqury += (re != 0 ? " union " : "") + "select '" + FICPOST.get(t).get("DIVD") + "' divd, '" + FICPOST.get(t).get("STATUS") + "' status,'" + FICPOST.get(t).get("TYPEVAL") + "'typeval,'" + FICPOST.get(t).get("FIELD") + "'field,'" + FICPOST.get(t).get("RANG") + "'rang,'" + fichier + "' fichi,'" + FICPOST.get(t).get("POST").toString() + "' post ,'" + FICPOST.get(t).get("COL").toString() + "' col, (" + result + ") result from dual";
                 if (re == 50) {//50 queries
                     et.add(globalpostqury);
