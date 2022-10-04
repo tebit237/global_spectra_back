@@ -1999,7 +1999,7 @@ public class GenererFichierServiceImpl extends GlobalService implements GenererF
                                 Cell cell = sheet
                                         .getRow(rown)
                                         .getCell(colStart + y - 1);
-                                cell.setCellValue(o.cellExtra(y) == null ? "s" : o.cellExtra(y));
+                                cell.setCellValue(o.cellExtra(y) == null ? "" : o.cellExtra(y));
                             } catch (Exception t) {
                                 System.out.println("return error y : " + y + "  and i:" + o.getId());
                             }

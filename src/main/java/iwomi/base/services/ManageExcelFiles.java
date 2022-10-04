@@ -229,21 +229,8 @@ public class ManageExcelFiles extends GlobalService {
                     if (currentRow.getCell(cellIdx) == null) {
                         reportRep.setValc("");
                     } else {
-//                        reportRep.setValc(currentRow.getCell(cellIdx).getStringCellValue());
-                        switch (currentRow.getCell(cellIdx).getCellType().toString()) {
-                            case "STRING":
-                                reportRep.setValc(currentRow.getCell(cellIdx).getStringCellValue());
-                                break;
-                            case "NUMERIC":
-                                NumberFormat nf = DecimalFormat.getInstance();
-                                nf.setMaximumFractionDigits(0);
-                                String str = nf.format(currentRow.getCell(cellIdx).getNumericCellValue());
-                                reportRep.setValc(str.replaceAll(",", ""));
-                                break;
-                            default:
-                                reportRep.setValc(currentRow.getCell(cellIdx).getStringCellValue());
+                        reportRep.setValc(s.formatCellValue(currentRow.getCell(cellIdx)));
                         }
-                    }
                     if (cellIdx == 0 && hh.get("result").equalsIgnoreCase("duplicateNoPost")) {
                         post = s.formatCellValue(currentRow.getCell(cellIdx));
                         System.out.println("the post is :" + post);
